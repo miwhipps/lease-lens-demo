@@ -21,7 +21,7 @@ class LeaseRAGAssistant:
         # Initialize Claude client with comprehensive error handling
         api_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
         logger.info(f"🔍 DEBUG: Initializing Claude client...")
-        
+
         if not api_key:
             logger.warning("⚠️ No Claude API key provided - using fallback responses")
             logger.warning("⚠️ Set ANTHROPIC_API_KEY environment variable or pass api_key parameter")
@@ -39,6 +39,7 @@ class LeaseRAGAssistant:
             except Exception as e:
                 logger.error(f"❌ Claude client initialization exception: {type(e).__name__}: {e}")
                 import traceback
+
                 logger.error(f"❌ Full initialization traceback: {traceback.format_exc()}")
                 self.client = None
 
@@ -64,7 +65,7 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
             import anthropic
             import sys
             import os
-            
+
             # Enhanced version debugging
             try:
                 version = anthropic.__version__
@@ -73,7 +74,7 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
                 logger.info(f"🔍 DEBUG: Anthropic module path: {anthropic.__file__}")
             except AttributeError as ve:
                 logger.warning(f"⚠️ Could not determine anthropic library version: {ve}")
-            
+
             # Log environment info for debugging
             logger.info(f"🔍 DEBUG: API key present: {'Yes' if api_key else 'No'}")
             logger.info(f"🔍 DEBUG: API key length: {len(api_key) if api_key else 0}")
@@ -83,14 +84,12 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
             try:
                 logger.info("🔄 Attempting Pattern 1: Modern v0.8+ initialization")
                 client = anthropic.Anthropic(api_key=api_key)
-                
+
                 # Test the client with a simple call
                 try:
                     logger.info("🔄 Testing client with simple API call...")
                     response = client.messages.create(
-                        model="claude-3-haiku-20240307", 
-                        max_tokens=10, 
-                        messages=[{"role": "user", "content": "Hi"}]
+                        model="claude-3-haiku-20240307", max_tokens=10, messages=[{"role": "user", "content": "Hi"}]
                     )
                     logger.info("✅ Pattern 1 SUCCESS: Modern client initialized and tested")
                     return client
@@ -99,7 +98,7 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
                     logger.warning(f"⚠️ Pattern 1: Test error type: {type(test_error).__name__}")
                     # Still return client as it might work for actual use
                     return client
-                    
+
             except TypeError as te:
                 logger.error(f"❌ Pattern 1 FAILED: TypeError during initialization: {te}")
                 logger.error(f"❌ Pattern 1: Error type: {type(te).__name__}")
@@ -109,10 +108,7 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
             # Pattern 2: Try with explicit timeout (some versions require this)
             try:
                 logger.info("🔄 Attempting Pattern 2: With explicit timeout")
-                client = anthropic.Anthropic(
-                    api_key=api_key,
-                    timeout=30.0
-                )
+                client = anthropic.Anthropic(api_key=api_key, timeout=30.0)
                 logger.info("✅ Pattern 2 SUCCESS: Client with timeout initialized")
                 return client
             except Exception as e:
@@ -130,7 +126,7 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
             # Pattern 4: Try legacy Client class if available
             try:
                 logger.info("🔄 Attempting Pattern 4: Legacy Client class")
-                if hasattr(anthropic, 'Client'):
+                if hasattr(anthropic, "Client"):
                     client = anthropic.Client(api_key=api_key)
                     logger.info("✅ Pattern 4 SUCCESS: Legacy Client initialized")
                     return client
@@ -142,7 +138,7 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
             # Pattern 5: Environment variable fallback
             try:
                 logger.info("🔄 Attempting Pattern 5: Environment variable fallback")
-                os.environ['ANTHROPIC_API_KEY'] = api_key
+                os.environ["ANTHROPIC_API_KEY"] = api_key
                 client = anthropic.Anthropic()
                 logger.info("✅ Pattern 5 SUCCESS: Environment variable client initialized")
                 return client
@@ -160,6 +156,7 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
             logger.error(f"❌ Unexpected error initializing Claude: {type(e).__name__}: {e}")
             logger.error(f"❌ Error details: {str(e)}")
             import traceback
+
             logger.error(f"❌ Full traceback: {traceback.format_exc()}")
             return None
 
@@ -261,15 +258,15 @@ If the information needed to answer the question is not in the context, please s
                 logger.info(f"🔍 DEBUG: Making API call to Claude...")
                 logger.info(f"🔍 DEBUG: Client type: {type(self.client).__name__}")
                 logger.info(f"🔍 DEBUG: Model: claude-3-5-sonnet-20241022")
-                
+
                 response = self.client.messages.create(
                     model="claude-3-5-sonnet-20241022",
                     max_tokens=1000,
                     temperature=0.1,
                     system=self.system_prompt,
-                    messages=[{"role": "user", "content": user_message}]
+                    messages=[{"role": "user", "content": user_message}],
                 )
-                
+
                 logger.info(f"🔍 DEBUG: Response received, type: {type(response).__name__}")
 
                 # Handle response format with detailed debugging
@@ -292,16 +289,17 @@ If the information needed to answer the question is not in the context, please s
             except Exception as api_error:
                 logger.error(f"❌ API call failed: {type(api_error).__name__}: {api_error}")
                 logger.error(f"❌ API error details: {str(api_error)}")
-                
+
                 # Try to provide more specific error information
-                if hasattr(api_error, 'status_code'):
+                if hasattr(api_error, "status_code"):
                     logger.error(f"❌ HTTP status code: {api_error.status_code}")
-                if hasattr(api_error, 'response'):
+                if hasattr(api_error, "response"):
                     logger.error(f"❌ Response content: {api_error.response}")
-                    
+
                 import traceback
+
                 logger.error(f"❌ API call traceback: {traceback.format_exc()}")
-                
+
                 return f"I found relevant information but couldn't generate a response due to an API error: {type(api_error).__name__}: {str(api_error)}"
 
         except Exception as e:
