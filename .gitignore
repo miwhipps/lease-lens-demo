@@ -1,0 +1,59 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data
+data/processed/*
+data/vector_store/*
+!data/processed/.gitkeep
+!data/vector_store/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Temporary files
+*.tmp
+temp/
+
+# Lambda deployment artifacts
+lambda_deployment/boto3/
+lambda_deployment/botocore/
+lambda_deployment/s3transfer/
+lambda_deployment/jmespath/
+lambda_deployment/dateutil/
+lambda_deployment/urllib3/
+lambda_deployment/six.py
+lambda_deployment/docutils/
+lambda_deployment/*.zip
+lambda_deployment/*.dist-info/
+lambda_deployment/__pycache__/
+
+# Or more broadly, exclude everything in lambda_deployment except source files
+lambda_deployment/*
+!lambda_deployment/lambda_function.py
+!lambda_deployment/requirements.txt
+
