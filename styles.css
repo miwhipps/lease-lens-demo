@@ -32,12 +32,12 @@
 
 /* Feature Cards */
 .feature-card {
-    background: white;
-    border: 1px solid #e1e5e9;
+    background: transparent;
+    border: none;
     border-radius: 12px;
     padding: 1.5rem;
     margin: 1rem 0;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    box-shadow: none;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
