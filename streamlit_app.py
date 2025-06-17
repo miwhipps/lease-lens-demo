@@ -1073,7 +1073,7 @@ def create_analytics_panel():
             "OCR Engine": "AWS Textract + OpenCV",
             "Embeddings": "Sentence Transformers",
             "Vector DB": "FAISS",
-            "LLM": "OpenAI GPT-3.5-Turbo",
+            "LLM": "Anthropic Claude",
             "Framework": "Streamlit + Python",
         }
 
