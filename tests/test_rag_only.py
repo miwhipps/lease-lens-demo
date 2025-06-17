@@ -82,11 +82,12 @@ def test_rag_assistant():
         else:
             print("    ❌ Key figures extraction failed")
 
-        return True
+        # Test completed successfully
+        assert True
 
     except Exception as e:
         print(f"❌ RAG assistant test error: {e}")
-        return False
+        assert False, f"RAG assistant test failed: {e}"
 
 
 if __name__ == "__main__":

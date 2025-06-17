@@ -44,16 +44,15 @@ def test_vector_store():
 
         # Test statistics
         stats = vs.get_document_stats()
-        if stats:
-            print(f"  ✅ Statistics: {stats['total_chunks']} chunks, {stats['total_documents']} docs")
-            return True
-        else:
-            print("  ❌ Statistics failed")
-            return False
+        assert stats is not None, "Statistics generation failed"
+        print(f"  ✅ Statistics: {stats['total_chunks']} chunks, {stats['total_documents']} docs")
+        
+        # Test completed successfully
+        assert True
 
     except Exception as e:
         print(f"❌ Vector store test error: {e}")
-        return False
+        assert False, f"Vector store test failed: {e}"
 
 
 if __name__ == "__main__":

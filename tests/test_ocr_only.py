@@ -26,17 +26,13 @@ def test_preprocessing():
         preprocessor = DocumentPreprocessor()
         result = preprocessor.enhance_document("test_doc.jpg")
 
-        if result is not None:
-            print("✅ Preprocessing test passed!")
-            print(f"   Output shape: {result.shape}")
-            return True
-        else:
-            print("❌ Preprocessing test failed!")
-            return False
+        assert result is not None, "Preprocessing result is None"
+        print("✅ Preprocessing test passed!")
+        print(f"   Output shape: {result.shape}")
 
     except Exception as e:
         print(f"❌ Preprocessing test error: {e}")
-        return False
+        assert False, f"Preprocessing test failed: {e}"
 
 
 def test_mock_textract():
@@ -56,18 +52,15 @@ def test_mock_textract():
         mock = MockTextract()
         result = mock.extract_from_file("test_doc.jpg")
 
-        if result and len(result["text"]) > 0:
-            print("✅ Mock Textract test passed!")
-            print(f'   Text length: {len(result["text"])} characters')
-            print(f'   Confidence: {result["confidence"]}%')
-            return True
-        else:
-            print("❌ Mock Textract test failed!")
-            return False
+        assert result is not None, "Mock Textract result is None"
+        assert len(result["text"]) > 0, "Mock Textract returned empty text"
+        print("✅ Mock Textract test passed!")
+        print(f'   Text length: {len(result["text"])} characters')
+        print(f'   Confidence: {result["confidence"]}%')
 
     except Exception as e:
         print(f"❌ Mock Textract test error: {e}")
-        return False
+        assert False, f"Mock Textract test failed: {e}"
 
 
 if __name__ == "__main__":
