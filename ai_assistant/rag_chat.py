@@ -62,37 +62,26 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
             except AttributeError:
                 logger.warning("⚠️ Could not determine anthropic library version")
 
-            # Method 1: Try modern initialization (v0.25.0+)
+            # Modern initialization (v0.8.0+)
             try:
-                client = anthropic.Anthropic(
-                    api_key=api_key,
-                    # Only include supported parameters
-                    timeout=30.0,  # Optional: set timeout
-                )
-
+                client = anthropic.Anthropic(api_key=api_key)
+                
                 # Test the client with a simple call to verify it works
                 try:
                     # Make a minimal test call to verify the client works
                     client.messages.create(
-                        model="claude-3-haiku-20240307", max_tokens=10, messages=[{"role": "user", "content": "Hi"}]
+                        model="claude-3-haiku-20240307", 
+                        max_tokens=10, 
+                        messages=[{"role": "user", "content": "Hi"}]
                     )
-                    logger.info("✅ Modern Anthropic client initialized and tested")
+                    logger.info("✅ Anthropic client initialized and tested")
                     return client
                 except Exception as test_error:
                     logger.warning(f"⚠️ Client created but test failed: {test_error}")
                     return client  # Return anyway, might work for actual use
 
-            except TypeError as e:
-                logger.warning(f"⚠️ Modern initialization failed: {e}")
-
-                # Method 2: Try legacy initialization (older versions)
-                try:
-                    # For older versions that might not support all parameters
-                    client = anthropic.Anthropic(api_key)  # Positional argument only
-                    logger.info("✅ Legacy Anthropic client initialization successful")
-                    return client
-                except Exception as e2:
-                    logger.error(f"❌ Legacy initialization also failed: {e2}")
+            except Exception as e:
+                logger.error(f"❌ Anthropic client initialization failed: {e}")
 
             except Exception as e:
                 logger.error(f"❌ Anthropic client creation failed: {e}")
@@ -199,14 +188,14 @@ Important: When citing sources, do not include any page references like "page X 
 If the information needed to answer the question is not in the context, please say "I cannot find this information in the lease document."
 """
 
-            # Try modern API call (v0.25.0+)
+            # Modern API call (v0.8.0+)
             try:
                 response = self.client.messages.create(
-                    model="claude-3-haiku-20240307",
-                    max_tokens=500,
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=1000,
                     temperature=0.1,
                     system=self.system_prompt,
-                    messages=[{"role": "user", "content": user_message}],
+                    messages=[{"role": "user", "content": user_message}]
                 )
 
                 # Handle response format
@@ -219,47 +208,12 @@ If the information needed to answer the question is not in the context, please s
                 else:
                     answer = str(response).strip()
 
-                logger.info("✅ Modern API call successful")
+                logger.info("✅ API call successful")
                 return answer
 
             except Exception as api_error:
-                logger.warning(f"⚠️ Modern API call failed: {api_error}")
-
-                # Try legacy API call format (older versions)
-                try:
-                    # For older versions of the anthropic library
-                    full_prompt = f"{self.system_prompt}\n\nHuman: {user_message}\n\nAssistant:"
-
-                    response = self.client.completions.create(
-                        model="claude-3-haiku-20240307", prompt=full_prompt, max_tokens_to_sample=500, temperature=0.1
-                    )
-
-                    if hasattr(response, "completion"):
-                        answer = response.completion.strip()
-                    else:
-                        answer = str(response).strip()
-
-                    logger.info("✅ Legacy API call successful")
-                    return answer
-
-                except Exception as legacy_error:
-                    logger.error(f"❌ Legacy API call also failed: {legacy_error}")
-
-                    # Try even more basic call
-                    try:
-                        # Last resort: try the simplest possible call
-                        response = self.client.messages.create(
-                            model="claude-3-haiku-20240307",
-                            max_tokens=500,
-                            messages=[{"role": "user", "content": user_message}],
-                        )
-                        answer = str(response.content[0].text if hasattr(response, "content") else response).strip()
-                        logger.info("✅ Basic API call successful")
-                        return answer
-
-                    except Exception as basic_error:
-                        logger.error(f"❌ All API call methods failed: {basic_error}")
-                        return "I found relevant information but couldn't generate a response due to an API error."
+                logger.error(f"❌ API call failed: {api_error}")
+                return "I found relevant information but couldn't generate a response due to an API error."
 
         except Exception as e:
             logger.error(f"❌ Claude API call failed: {e}")
