@@ -104,7 +104,7 @@ jobs:
   build-docker:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: false
 
     steps:
       - name: Checkout code
