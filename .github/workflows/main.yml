@@ -44,7 +44,7 @@ jobs:
 
       - name: Code formatting check
         run: |
-          black --check --diff .
+          black --check --diff . --line-length 127
 
       - name: Lint with flake8
         run: |
