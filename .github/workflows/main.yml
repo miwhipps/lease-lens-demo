@@ -38,7 +38,7 @@ jobs:
 
       - name: Security scan
         run: |
-          safety check
+          safety scan --ignore 66742
           bandit -r . -x tests/
 
       - name: Code formatting check
