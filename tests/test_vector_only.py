@@ -46,7 +46,7 @@ def test_vector_store():
         stats = vs.get_document_stats()
         assert stats is not None, "Statistics generation failed"
         print(f"  ✅ Statistics: {stats['total_chunks']} chunks, {stats['total_documents']} docs")
-        
+
         # Test completed successfully
         assert True
 

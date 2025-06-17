@@ -96,24 +96,25 @@ def test_ocr_pipeline():
     """Test the OCR preprocessing and extraction pipeline"""
     # Create test image
     test_image = create_test_lease_image()
-    
+
     # Test document preprocessing
     preprocessor = DocumentPreprocessor()
     processed_image = preprocessor.enhance_document(test_image)
-    
+
     assert processed_image is not None
     assert processed_image.shape[0] > 0
-    
+
     # Test mock extraction (for CI/CD without AWS)
     from ocr_pipeline.textract_extract import MockTextractExtractor
+
     extractor = MockTextractExtractor()
     result = extractor.extract_from_file(test_image)
-    
+
     assert result is not None
     assert "text" in result
     assert len(result["text"]) > 0
     assert "confidence" in result
-    
+
     # Clean up test file
     if os.path.exists(test_image):
         os.remove(test_image)
@@ -123,19 +124,19 @@ def test_vector_store():
     """Test the vector store functionality"""
     # Initialize vector store
     vector_store = LeaseVectorStore()
-    
+
     # Test document addition
     sample_text = "Monthly rent is $3,200. Security deposit is $6,400."
     vector_store.add_document(sample_text, "test_doc", {"source": "test"})
-    
+
     # Test search functionality
     results = vector_store.search("What is the rent?", k=2)
-    
+
     assert len(vector_store.texts) > 0
     assert results is not None
     assert len(results) > 0
     assert "score" in results[0]
-    
+
     # Test statistics
     stats = vector_store.get_document_stats()
     assert stats is not None
@@ -148,7 +149,7 @@ def vector_store():
     """Create a vector store fixture for testing"""
     # Initialize vector store
     vs = LeaseVectorStore()
-    
+
     # Add sample test data
     sample_lease_text = """
     RESIDENTIAL LEASE AGREEMENT
@@ -181,18 +182,19 @@ def vector_store():
     Tenant responsible for minor maintenance under $75 per incident.
     Emergency maintenance hotline: (555) 123-4567
     """
-    
+
     vs.add_document(sample_lease_text, "test_lease_001", {"filename": "test_lease.pdf", "source": "test"})
     return vs
+
 
 def test_rag_assistant(vector_store):
     """Test the RAG assistant functionality"""
     # Test 1: RAG Initialization
     rag_assistant = LeaseRAGAssistant(vector_store)
-    
+
     # Test basic functionality
     response = rag_assistant.query("What is the monthly rent?")
-    
+
     assert response is not None
     assert "answer" in response
     assert len(response["answer"]) > 0
@@ -200,26 +202,25 @@ def test_rag_assistant(vector_store):
     assert response["confidence"] >= 0
 
 
-
 def test_end_to_end_integration():
     """Test complete end-to-end integration"""
     # Create components needed for integration test
     vector_store = LeaseVectorStore()
-    
+
     # Add test document to vector store
     sample_text = """
     Monthly rent is $3,200 per month. Security deposit is $6,400.
     Parking space included. Additional parking available for $150/month.
     """
     vector_store.add_document(sample_text, "integration_test", {"source": "test"})
-    
+
     # Create RAG assistant
     rag_assistant = LeaseRAGAssistant(vector_store)
-    
+
     # Test integration query
     integration_query = "What would be my total monthly cost including rent and parking?"
     response = rag_assistant.query(integration_query)
-    
+
     # Assertions for integration test
     assert response is not None
     assert "answer" in response
