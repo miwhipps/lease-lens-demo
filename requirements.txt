@@ -4,12 +4,8 @@ opencv-python-headless==4.9.0.80
 numpy==1.26.4
 pandas==2.2.0
 
-# Claude API
+# Claude AI (your main AI functionality)
 anthropic==0.8.1
-
-# LLM and RAG
-langchain-core==0.1.7
-langchain-community==0.0.15
 
 # Web framework and UI
 streamlit==1.31.0
