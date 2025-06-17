@@ -11,14 +11,15 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class LeaseRAGAssistant:
     """RAG-based lease assistant with fixed Claude integration"""
-    
+
     def __init__(self, vector_store, anthropic_api_key: str = None):
         self.vector_store = vector_store
-        
+
         # Initialize Claude client with better error handling
-        api_key = anthropic_api_key or os.getenv('ANTHROPIC_API_KEY')
+        api_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             logger.warning("⚠️ No Claude API key provided - using fallback responses")
             self.client = None
@@ -32,7 +33,7 @@ class LeaseRAGAssistant:
             except Exception as e:
                 logger.error(f"❌ Claude client initialization failed: {e}")
                 self.client = None
-        
+
         # System prompt for Claude
         self.system_prompt = """You are a helpful assistant that answers questions about lease documents.
 
@@ -48,19 +49,19 @@ IMPORTANT INSTRUCTIONS:
 
 Context will be provided as numbered sources. Reference them as "Source 1", "Source 2", etc.
 """
-    
+
     def _initialize_claude_client(self, api_key: str):
         """Initialize Claude client with proper version handling"""
         try:
             import anthropic
-            
+
             # Check anthropic version for compatibility
             try:
                 version = anthropic.__version__
                 logger.info(f"📦 Anthropic library version: {version}")
             except AttributeError:
                 logger.warning("⚠️ Could not determine anthropic library version")
-            
+
             # Method 1: Try modern initialization (v0.25.0+)
             try:
                 client = anthropic.Anthropic(
@@ -68,24 +69,22 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
                     # Only include supported parameters
                     timeout=30.0,  # Optional: set timeout
                 )
-                
+
                 # Test the client with a simple call to verify it works
                 try:
                     # Make a minimal test call to verify the client works
                     client.messages.create(
-                        model="claude-3-haiku-20240307",
-                        max_tokens=10,
-                        messages=[{"role": "user", "content": "Hi"}]
+                        model="claude-3-haiku-20240307", max_tokens=10, messages=[{"role": "user", "content": "Hi"}]
                     )
                     logger.info("✅ Modern Anthropic client initialized and tested")
                     return client
                 except Exception as test_error:
                     logger.warning(f"⚠️ Client created but test failed: {test_error}")
                     return client  # Return anyway, might work for actual use
-                    
+
             except TypeError as e:
                 logger.warning(f"⚠️ Modern initialization failed: {e}")
-                
+
                 # Method 2: Try legacy initialization (older versions)
                 try:
                     # For older versions that might not support all parameters
@@ -94,94 +93,94 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
                     return client
                 except Exception as e2:
                     logger.error(f"❌ Legacy initialization also failed: {e2}")
-            
+
             except Exception as e:
                 logger.error(f"❌ Anthropic client creation failed: {e}")
-                
+
             return None
-            
+
         except ImportError:
             logger.error("❌ Anthropic library not installed. Install with: pip install anthropic")
             return None
         except Exception as e:
             logger.error(f"❌ Unexpected error initializing Claude: {e}")
             return None
-            
+
     def query(self, question: str, k: int = 5) -> Dict[str, Any]:
         """Query the lease assistant using RAG"""
         logger.info(f"❓ Processing query: '{question}'")
-        
+
         # Retrieve relevant chunks
         results = self.vector_store.search(question, k=k)
-        
+
         if not results:
             return {
-                'answer': "I cannot find relevant information in the lease document to answer your question.",
-                'sources': [],
-                'confidence': 0.0,
-                'method': 'no_results'
+                "answer": "I cannot find relevant information in the lease document to answer your question.",
+                "sources": [],
+                "confidence": 0.0,
+                "method": "no_results",
             }
-        
+
         # Prepare context from retrieved chunks
         context_parts = []
         for i, result in enumerate(results, 1):
             # Clean source text by removing page references and other noise
-            clean_text = self._clean_source_text(result['text'])
+            clean_text = self._clean_source_text(result["text"])
             # Include chunk and document information for better source attribution
-            doc_id = result.get('doc_id', 'document')
-            chunk_id = result.get('chunk_id', i-1)
+            doc_id = result.get("doc_id", "document")
+            chunk_id = result.get("chunk_id", i - 1)
             context_parts.append(f"Source {i} (from {doc_id}, section {chunk_id}): {clean_text}")
-        
+
         context = "\n\n".join(context_parts)
-        
+
         # Generate answer
         if self.client:
             answer = self._generate_claude_answer(question, context)
-            method = 'claude'
+            method = "claude"
         else:
             answer = self._generate_fallback_answer(question, results)
-            method = 'fallback'
-        
+            method = "fallback"
+
         # Calculate confidence based on retrieval scores
-        confidence = np.mean([r['score'] for r in results]) if results else 0.0
-        
+        confidence = np.mean([r["score"] for r in results]) if results else 0.0
+
         response = {
-            'answer': answer,
-            'sources': results,
-            'confidence': float(confidence),
-            'method': method,
-            'context_used': len(results)
+            "answer": answer,
+            "sources": results,
+            "confidence": float(confidence),
+            "method": method,
+            "context_used": len(results),
         }
-        
+
         logger.info(f"✅ Generated answer using {method} method (confidence: {confidence:.3f})")
         return response
-    
+
     def _clean_source_text(self, text: str) -> str:
         """Clean source text by removing page references and other noise"""
         # Remove page references like "page 1 of 10", "Page 1/10", etc.
         import re
-        
+
         # Remove common page reference patterns
-        text = re.sub(r'\bpage\s+\d+\s+of\s+\d+\b', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\bpage\s+\d+/\d+\b', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\b\d+\s+of\s+\d+\s+pages?\b', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\bpg\.?\s+\d+\b', '', text, flags=re.IGNORECASE)
-        
+        text = re.sub(r"\bpage\s+\d+\s+of\s+\d+\b", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bpage\s+\d+/\d+\b", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\b\d+\s+of\s+\d+\s+pages?\b", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\bpg\.?\s+\d+\b", "", text, flags=re.IGNORECASE)
+
         # Remove excessive whitespace and normalize
-        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r"\s+", " ", text)
         text = text.strip()
-        
+
         # Clean up double punctuation left after page removal
-        text = re.sub(r'[\.]{2,}', '.', text)  # Multiple periods to single
-        text = re.sub(r'\.\s*\.', '.', text)  # Spaced double periods
-        text = re.sub(r'\s*\.\s*\.', '.', text)  # Various double period patterns
-        
+        text = re.sub(r"[\.]{2,}", ".", text)  # Multiple periods to single
+        text = re.sub(r"\.\s*\.", ".", text)  # Spaced double periods
+        text = re.sub(r"\s*\.\s*\.", ".", text)  # Various double period patterns
+
         # Remove common OCR artifacts and formatting noise
-        text = re.sub(r'^[-\s]+|[-\s]+$', '', text)  # Leading/trailing dashes
-        text = re.sub(r'\s*\n\s*', '\n', text)  # Clean line breaks
-        
+        text = re.sub(r"^[-\s]+|[-\s]+$", "", text)  # Leading/trailing dashes
+        text = re.sub(r"\s*\n\s*", "\n", text)  # Clean line breaks
+
         return text
-    
+
     def _generate_claude_answer(self, question: str, context: str) -> str:
         """Generate answer using Claude API with better error handling"""
         try:
@@ -199,7 +198,7 @@ Important: When citing sources, do not include any page references like "page X 
 
 If the information needed to answer the question is not in the context, please say "I cannot find this information in the lease document."
 """
-            
+
             # Try modern API call (v0.25.0+)
             try:
                 response = self.client.messages.create(
@@ -207,155 +206,156 @@ If the information needed to answer the question is not in the context, please s
                     max_tokens=500,
                     temperature=0.1,
                     system=self.system_prompt,
-                    messages=[{"role": "user", "content": user_message}]
+                    messages=[{"role": "user", "content": user_message}],
                 )
-                
+
                 # Handle response format
-                if hasattr(response, 'content') and len(response.content) > 0:
-                    if hasattr(response.content[0], 'text'):
+                if hasattr(response, "content") and len(response.content) > 0:
+                    if hasattr(response.content[0], "text"):
                         answer = response.content[0].text.strip()
                     else:
                         # Handle different response formats
                         answer = str(response.content[0]).strip()
                 else:
                     answer = str(response).strip()
-                    
+
                 logger.info("✅ Modern API call successful")
                 return answer
-                
+
             except Exception as api_error:
                 logger.warning(f"⚠️ Modern API call failed: {api_error}")
-                
+
                 # Try legacy API call format (older versions)
                 try:
                     # For older versions of the anthropic library
                     full_prompt = f"{self.system_prompt}\n\nHuman: {user_message}\n\nAssistant:"
-                    
+
                     response = self.client.completions.create(
-                        model="claude-3-haiku-20240307",
-                        prompt=full_prompt,
-                        max_tokens_to_sample=500,
-                        temperature=0.1
+                        model="claude-3-haiku-20240307", prompt=full_prompt, max_tokens_to_sample=500, temperature=0.1
                     )
-                    
-                    if hasattr(response, 'completion'):
+
+                    if hasattr(response, "completion"):
                         answer = response.completion.strip()
                     else:
                         answer = str(response).strip()
-                        
+
                     logger.info("✅ Legacy API call successful")
                     return answer
-                    
+
                 except Exception as legacy_error:
                     logger.error(f"❌ Legacy API call also failed: {legacy_error}")
-                    
+
                     # Try even more basic call
                     try:
                         # Last resort: try the simplest possible call
                         response = self.client.messages.create(
                             model="claude-3-haiku-20240307",
                             max_tokens=500,
-                            messages=[{"role": "user", "content": user_message}]
+                            messages=[{"role": "user", "content": user_message}],
                         )
-                        answer = str(response.content[0].text if hasattr(response, 'content') else response).strip()
+                        answer = str(response.content[0].text if hasattr(response, "content") else response).strip()
                         logger.info("✅ Basic API call successful")
                         return answer
-                        
+
                     except Exception as basic_error:
                         logger.error(f"❌ All API call methods failed: {basic_error}")
                         return "I found relevant information but couldn't generate a response due to an API error."
-            
+
         except Exception as e:
             logger.error(f"❌ Claude API call failed: {e}")
             return "I found relevant information but couldn't generate a proper response due to an API error. Please check the sources below for the information you're looking for."
-    
+
     def _generate_fallback_answer(self, question: str, results: List[Dict]) -> str:
         """Generate enhanced fallback answer without Claude"""
         question_lower = question.lower()
-        
+
         # Enhanced keyword-based answer generation with better formatting
-        if any(word in question_lower for word in ['rent', 'payment', 'cost', 'price', 'monthly']):
+        if any(word in question_lower for word in ["rent", "payment", "cost", "price", "monthly"]):
             for result in results:
-                text = result['text'].lower()
+                text = result["text"].lower()
                 # Look for rent-related information more broadly
-                if any(phrase in text for phrase in ['monthly rent', 'rent:', '$', '£', 'per month', 'payment']):
-                    amounts = re.findall(r'[£$][\d,]+(?:\.\d{2})?', result['text'])
+                if any(phrase in text for phrase in ["monthly rent", "rent:", "$", "£", "per month", "payment"]):
+                    amounts = re.findall(r"[£$][\d,]+(?:\.\d{2})?", result["text"])
                     if amounts:
                         # Find the context around the amount
-                        text_lines = result['text'].split('\n')
+                        text_lines = result["text"].split("\n")
                         rent_context = ""
                         for line in text_lines:
-                            if any(word in line.lower() for word in ['rent', 'monthly', '$']) and any(amt in line for amt in amounts):
+                            if any(word in line.lower() for word in ["rent", "monthly", "$"]) and any(
+                                amt in line for amt in amounts
+                            ):
                                 rent_context = line.strip()
                                 break
-                        
+
                         if rent_context:
                             return f"**Monthly Rent Information:**\n{rent_context}\n\n*Source: \"{result['text'][:200]}...\"*"
                         else:
                             return f"**Monthly Rent Information:**\nThe rent amount is **{amounts[0]}** per month.\n\n*Source: \"{result['text'][:200]}...\"*"
-        
-        elif any(word in question_lower for word in ['pet', 'animal', 'dog', 'cat']):
+
+        elif any(word in question_lower for word in ["pet", "animal", "dog", "cat"]):
             for result in results:
-                if any(word in result['text'].lower() for word in ['pet', 'animal', 'dog', 'cat']):
+                if any(word in result["text"].lower() for word in ["pet", "animal", "dog", "cat"]):
                     return f"**Pet Policy:**\n{result['text'][:300]}...\n\n*Based on the lease document*"
-        
-        elif any(word in question_lower for word in ['break', 'terminate', 'end', 'cancel', 'notice']):
+
+        elif any(word in question_lower for word in ["break", "terminate", "end", "cancel", "notice"]):
             for result in results:
-                if any(word in result['text'].lower() for word in ['break', 'terminate', 'notice']):
+                if any(word in result["text"].lower() for word in ["break", "terminate", "notice"]):
                     return f"**Termination Clause:**\n{result['text'][:300]}...\n\n*From the lease agreement*"
-        
-        elif any(word in question_lower for word in ['deposit', 'security']):
+
+        elif any(word in question_lower for word in ["deposit", "security"]):
             for result in results:
-                if 'deposit' in result['text'].lower():
-                    amounts = re.findall(r'[£$][\d,]+(?:\.\d{2})?', result['text'])
+                if "deposit" in result["text"].lower():
+                    amounts = re.findall(r"[£$][\d,]+(?:\.\d{2})?", result["text"])
                     if amounts:
                         return f"**Security Deposit:**\nThe security deposit is **{amounts[0]}**.\n\n*Source: \"{result['text'][:200]}...\"*"
                     return f"**Security Deposit Information:**\n{result['text'][:300]}..."
-        
-        elif any(word in question_lower for word in ['parking', 'space']):
+
+        elif any(word in question_lower for word in ["parking", "space"]):
             for result in results:
-                if 'parking' in result['text'].lower():
+                if "parking" in result["text"].lower():
                     return f"**Parking Information:**\n{result['text'][:300]}...\n\n*From the lease agreement*"
-        
-        elif any(word in question_lower for word in ['utility', 'utilities', 'electric', 'water']):
+
+        elif any(word in question_lower for word in ["utility", "utilities", "electric", "water"]):
             for result in results:
-                if any(word in result['text'].lower() for word in ['utility', 'utilities', 'electric', 'water', 'gas']):
+                if any(word in result["text"].lower() for word in ["utility", "utilities", "electric", "water", "gas"]):
                     return f"**Utilities Information:**\n{result['text'][:300]}...\n\n*Based on the lease terms*"
-        
-        elif any(word in question_lower for word in ['maintenance', 'repair', 'fix']):
+
+        elif any(word in question_lower for word in ["maintenance", "repair", "fix"]):
             for result in results:
-                if any(word in result['text'].lower() for word in ['maintenance', 'repair', 'responsible']):
+                if any(word in result["text"].lower() for word in ["maintenance", "repair", "responsible"]):
                     return f"**Maintenance Responsibilities:**\n{result['text'][:300]}...\n\n*From the lease document*"
-        
-        elif any(word in question_lower for word in ['sublet', 'subletting', 'roommate']):
+
+        elif any(word in question_lower for word in ["sublet", "subletting", "roommate"]):
             for result in results:
-                if any(word in result['text'].lower() for word in ['sublet', 'subletting', 'permission']):
+                if any(word in result["text"].lower() for word in ["sublet", "subletting", "permission"]):
                     return f"**Subletting Policy:**\n{result['text'][:300]}...\n\n*According to the lease agreement*"
-        
+
         # Default response with top result
         if results:
-            return f"**Based on the lease document:**\n\n{results[0]['text'][:400]}...\n\n*Confidence: {results[0]['score']:.1%}*"
-        
+            return (
+                f"**Based on the lease document:**\n\n{results[0]['text'][:400]}...\n\n*Confidence: {results[0]['score']:.1%}*"
+            )
+
         return "I cannot find specific information to answer your question in the lease document."
-    
+
     def batch_query(self, questions: List[str]) -> List[Dict[str, Any]]:
         """Process multiple questions at once"""
         logger.info(f"🔄 Processing batch of {len(questions)} questions")
-        
+
         results = []
         for question in questions:
             result = self.query(question)
             results.append(result)
-        
+
         return results
-    
+
     def get_lease_summary(self) -> Dict[str, str]:
         """Generate a summary of key lease terms"""
         logger.info("📋 Generating lease summary")
-        
+
         key_questions = [
             "What is the monthly rent amount?",
-            "What is the security deposit?", 
+            "What is the security deposit?",
             "What is the lease term duration?",
             "What are the pet policies?",
             "What utilities are included?",
@@ -363,9 +363,9 @@ If the information needed to answer the question is not in the context, please s
             "What are the parking arrangements?",
             "Who is responsible for maintenance?",
             "What are the late fees?",
-            "Can the property be subletted?"
+            "Can the property be subletted?",
         ]
-        
+
         summary = {}
         for question in key_questions:
             response = self.query(question, k=3)
@@ -392,197 +392,208 @@ If the information needed to answer the question is not in the context, please s
                 key = "Subletting Policy"
             else:
                 # Fallback: clean up the question as a key
-                key = question.replace("What ", "").replace("?", "").replace("Are there any ", "").replace("Can the ", "").replace("Who is ", "").title()
-            
-            summary[key] = response['answer']
-        
+                key = (
+                    question.replace("What ", "")
+                    .replace("?", "")
+                    .replace("Are there any ", "")
+                    .replace("Can the ", "")
+                    .replace("Who is ", "")
+                    .title()
+                )
+
+            summary[key] = response["answer"]
+
         return summary
-    
+
     def analyze_lease_risks(self) -> List[Dict[str, Any]]:
         """Analyze potential risks or red flags in the lease"""
         logger.info("⚠️ Analyzing lease risks")
-        
+
         risk_queries = [
             "Are there any unusual penalty clauses?",
             "What happens if rent is paid late?",
-            "Are there any automatic renewal clauses?", 
+            "Are there any automatic renewal clauses?",
             "What are the subletting restrictions?",
             "Are there any additional fees mentioned?",
             "What are the termination penalties?",
             "Are there any damage liability clauses?",
-            "What are the guest policy restrictions?"
+            "What are the guest policy restrictions?",
         ]
-        
+
         risks = []
         for query in risk_queries:
             response = self.query(query, k=2)
-            if response['confidence'] > 0.4:
-                risk_level = self._assess_risk_level(response['answer'])
-                risks.append({
-                    'category': query.replace("Are there any ", "").replace("What ", "").replace("?", ""),
-                    'description': response['answer'],
-                    'risk_level': risk_level,
-                    'confidence': response['confidence'],
-                    'sources': response['sources'][:2]
-                })
-        
+            if response["confidence"] > 0.4:
+                risk_level = self._assess_risk_level(response["answer"])
+                risks.append(
+                    {
+                        "category": query.replace("Are there any ", "").replace("What ", "").replace("?", ""),
+                        "description": response["answer"],
+                        "risk_level": risk_level,
+                        "confidence": response["confidence"],
+                        "sources": response["sources"][:2],
+                    }
+                )
+
         return risks
-    
+
     def _assess_risk_level(self, answer: str) -> str:
         """Assess risk level based on answer content"""
         answer_lower = answer.lower()
-        
+
         # High risk indicators
         high_risk_words = [
-            'penalty', 'forfeit', 'immediate', 'eviction', 'legal action',
-            'automatic renewal', 'unlimited liability', 'excessive'
+            "penalty",
+            "forfeit",
+            "immediate",
+            "eviction",
+            "legal action",
+            "automatic renewal",
+            "unlimited liability",
+            "excessive",
         ]
         if any(word in answer_lower for word in high_risk_words):
-            return 'HIGH'
-        
+            return "HIGH"
+
         # Medium risk indicators
         medium_risk_words = [
-            'fee', 'charge', 'additional', 'restriction', 'prohibited',
-            'written permission', 'approval required', 'not allowed'
+            "fee",
+            "charge",
+            "additional",
+            "restriction",
+            "prohibited",
+            "written permission",
+            "approval required",
+            "not allowed",
         ]
         if any(word in answer_lower for word in medium_risk_words):
-            return 'MEDIUM'
-        
-        return 'LOW'
-    
+            return "MEDIUM"
+
+        return "LOW"
+
     def extract_key_figures(self) -> Dict[str, Any]:
         """Extract key financial and date figures from the lease"""
         logger.info("💰 Extracting key figures")
-        
+
         financial_queries = [
             "What is the monthly rent?",
             "What is the security deposit?",
             "What are the late fees?",
-            "What are the pet fees?", 
-            "What are the parking costs?"
+            "What are the pet fees?",
+            "What are the parking costs?",
         ]
-        
-        date_queries = [
-            "When does the lease start?",
-            "When does the lease end?",
-            "What is the lease duration?"
-        ]
-        
-        figures = {
-            'financial': {},
-            'dates': {},
-            'summary': {}
-        }
-        
+
+        date_queries = ["When does the lease start?", "When does the lease end?", "What is the lease duration?"]
+
+        figures = {"financial": {}, "dates": {}, "summary": {}}
+
         # Extract financial information
         for query in financial_queries:
             response = self.query(query, k=2)
             key = query.replace("What is the ", "").replace("What are the ", "").replace("?", "")
-            
-            amounts = re.findall(r'[£$][\d,]+(?:\.\d{2})?', response['answer'])
-            figures['financial'][key] = {
-                'raw_answer': response['answer'],
-                'amounts': amounts,
-                'confidence': response['confidence']
+
+            amounts = re.findall(r"[£$][\d,]+(?:\.\d{2})?", response["answer"])
+            figures["financial"][key] = {
+                "raw_answer": response["answer"],
+                "amounts": amounts,
+                "confidence": response["confidence"],
             }
-        
+
         # Extract date information
         for query in date_queries:
             response = self.query(query, k=2)
             key = query.replace("When does the ", "").replace("What is the ", "").replace("?", "")
-            
-            figures['dates'][key] = {
-                'raw_answer': response['answer'],
-                'confidence': response['confidence']
-            }
-        
+
+            figures["dates"][key] = {"raw_answer": response["answer"], "confidence": response["confidence"]}
+
         # Generate summary
-        total_monthly_cost = self._calculate_total_monthly_cost(figures['financial'])
-        figures['summary'] = {
-            'estimated_monthly_cost': total_monthly_cost,
-            'move_in_cost': self._calculate_move_in_cost(figures['financial'])
+        total_monthly_cost = self._calculate_total_monthly_cost(figures["financial"])
+        figures["summary"] = {
+            "estimated_monthly_cost": total_monthly_cost,
+            "move_in_cost": self._calculate_move_in_cost(figures["financial"]),
         }
-        
+
         return figures
-    
+
     def _calculate_total_monthly_cost(self, financial_data: Dict) -> str:
         """Calculate estimated total monthly cost"""
         try:
             total = 0
-            
+
             # Add rent
-            rent_amounts = financial_data.get('monthly rent', {}).get('amounts', [])
+            rent_amounts = financial_data.get("monthly rent", {}).get("amounts", [])
             if rent_amounts:
-                rent = float(rent_amounts[0].replace('$', '').replace('£', '').replace(',', ''))
+                rent = float(rent_amounts[0].replace("$", "").replace("£", "").replace(",", ""))
                 total += rent
-            
+
             # Add parking if monthly
-            parking_amounts = financial_data.get('parking costs', {}).get('amounts', [])
-            parking_answer = financial_data.get('parking costs', {}).get('raw_answer', '')
-            if parking_amounts and 'month' in parking_answer.lower():
-                parking = float(parking_amounts[0].replace('$', '').replace('£', '').replace(',', ''))
+            parking_amounts = financial_data.get("parking costs", {}).get("amounts", [])
+            parking_answer = financial_data.get("parking costs", {}).get("raw_answer", "")
+            if parking_amounts and "month" in parking_answer.lower():
+                parking = float(parking_amounts[0].replace("$", "").replace("£", "").replace(",", ""))
                 total += parking
-            
+
             # Add pet fees if monthly
-            pet_amounts = financial_data.get('pet fees', {}).get('amounts', [])
-            pet_answer = financial_data.get('pet fees', {}).get('raw_answer', '')
-            if pet_amounts and 'month' in pet_answer.lower():
-                pet_fee = float(pet_amounts[0].replace('$', '').replace('£', '').replace(',', ''))
+            pet_amounts = financial_data.get("pet fees", {}).get("amounts", [])
+            pet_answer = financial_data.get("pet fees", {}).get("raw_answer", "")
+            if pet_amounts and "month" in pet_answer.lower():
+                pet_fee = float(pet_amounts[0].replace("$", "").replace("£", "").replace(",", ""))
                 total += pet_fee
-            
+
             return f"${total:,.2f}/month" if total > 0 else "Unable to calculate"
-            
+
         except Exception as e:
             logger.error(f"Error calculating monthly cost: {e}")
             return "Unable to calculate"
-    
+
     def _calculate_move_in_cost(self, financial_data: Dict) -> str:
         """Calculate estimated move-in cost"""
         try:
             total = 0
-            
+
             # Add first month rent
-            rent_amounts = financial_data.get('monthly rent', {}).get('amounts', [])
+            rent_amounts = financial_data.get("monthly rent", {}).get("amounts", [])
             if rent_amounts:
-                rent = float(rent_amounts[0].replace('$', '').replace('£', '').replace(',', ''))
+                rent = float(rent_amounts[0].replace("$", "").replace("£", "").replace(",", ""))
                 total += rent
-            
+
             # Add security deposit
-            deposit_amounts = financial_data.get('security deposit', {}).get('amounts', [])
+            deposit_amounts = financial_data.get("security deposit", {}).get("amounts", [])
             if deposit_amounts:
-                deposit = float(deposit_amounts[0].replace('$', '').replace('£', '').replace(',', ''))
+                deposit = float(deposit_amounts[0].replace("$", "").replace("£", "").replace(",", ""))
                 total += deposit
-            
+
             return f"${total:,.2f}" if total > 0 else "Unable to calculate"
-            
+
         except Exception as e:
             logger.error(f"Error calculating move-in cost: {e}")
             return "Unable to calculate"
+
 
 # Test function
 def test_rag_assistant():
     """Test RAG assistant functionality"""
     logger.info("🧪 Testing RAG assistant...")
-    
+
     # Mock vector store for testing
     class MockVectorStore:
         def search(self, query, k=5):
             return [
                 {
-                    'text': 'Monthly rent is $2,000 per month, due on the 1st of each month. Late fees of $50 apply after the 5th day.',
-                    'score': 0.95,
-                    'metadata': {'doc_id': 'test_lease', 'chunk_id': 0}
+                    "text": "Monthly rent is $2,000 per month, due on the 1st of each month. Late fees of $50 apply after the 5th day.",
+                    "score": 0.95,
+                    "metadata": {"doc_id": "test_lease", "chunk_id": 0},
                 }
             ]
-    
+
     # Test assistant
     mock_vector_store = MockVectorStore()
     assistant = LeaseRAGAssistant(mock_vector_store)
-    
+
     # Test query
     response = assistant.query("What is the monthly rent?")
-    
-    if response and response['answer']:
+
+    if response and response["answer"]:
         logger.info("✅ RAG assistant test passed!")
         logger.info(f"   Answer: {response['answer'][:100]}...")
         logger.info(f"   Confidence: {response['confidence']:.3f}")
@@ -591,6 +602,7 @@ def test_rag_assistant():
     else:
         logger.error("❌ RAG assistant test failed!")
         return False
+
 
 if __name__ == "__main__":
     test_rag_assistant()
