@@ -18,20 +18,28 @@ class LeaseRAGAssistant:
     def __init__(self, vector_store, anthropic_api_key: str = None):
         self.vector_store = vector_store
 
-        # Initialize Claude client with better error handling
+        # Initialize Claude client with comprehensive error handling
         api_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+        logger.info(f"🔍 DEBUG: Initializing Claude client...")
+        
         if not api_key:
             logger.warning("⚠️ No Claude API key provided - using fallback responses")
+            logger.warning("⚠️ Set ANTHROPIC_API_KEY environment variable or pass api_key parameter")
             self.client = None
         else:
+            logger.info(f"🔍 DEBUG: API key found, attempting client initialization...")
             try:
                 self.client = self._initialize_claude_client(api_key)
                 if self.client:
-                    logger.info("✅ Claude client initialized")
+                    logger.info("✅ Claude client successfully initialized")
+                    logger.info(f"✅ Client type: {type(self.client).__name__}")
                 else:
-                    logger.warning("⚠️ Claude client initialization failed - using fallback")
+                    logger.warning("⚠️ Claude client initialization returned None - using fallback responses")
+                    logger.warning("⚠️ Check API key validity and network connectivity")
             except Exception as e:
-                logger.error(f"❌ Claude client initialization failed: {e}")
+                logger.error(f"❌ Claude client initialization exception: {type(e).__name__}: {e}")
+                import traceback
+                logger.error(f"❌ Full initialization traceback: {traceback.format_exc()}")
                 self.client = None
 
         # System prompt for Claude
@@ -51,48 +59,108 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
 """
 
     def _initialize_claude_client(self, api_key: str):
-        """Initialize Claude client with proper version handling"""
+        """Initialize Claude client with comprehensive error handling and fallback patterns"""
         try:
             import anthropic
-
-            # Check anthropic version for compatibility
+            import sys
+            import os
+            
+            # Enhanced version debugging
             try:
                 version = anthropic.__version__
-                logger.info(f"📦 Anthropic library version: {version}")
-            except AttributeError:
-                logger.warning("⚠️ Could not determine anthropic library version")
+                logger.info(f"🔍 DEBUG: Anthropic library version: {version}")
+                logger.info(f"🔍 DEBUG: Python version: {sys.version}")
+                logger.info(f"🔍 DEBUG: Anthropic module path: {anthropic.__file__}")
+            except AttributeError as ve:
+                logger.warning(f"⚠️ Could not determine anthropic library version: {ve}")
+            
+            # Log environment info for debugging
+            logger.info(f"🔍 DEBUG: API key present: {'Yes' if api_key else 'No'}")
+            logger.info(f"🔍 DEBUG: API key length: {len(api_key) if api_key else 0}")
+            logger.info(f"🔍 DEBUG: Environment variables: ANTHROPIC_API_KEY={bool(os.getenv('ANTHROPIC_API_KEY'))}")
 
-            # Modern initialization (v0.8.0+)
+            # Pattern 1: Modern v0.8+ initialization (recommended)
             try:
+                logger.info("🔄 Attempting Pattern 1: Modern v0.8+ initialization")
                 client = anthropic.Anthropic(api_key=api_key)
                 
-                # Test the client with a simple call to verify it works
+                # Test the client with a simple call
                 try:
-                    # Make a minimal test call to verify the client works
-                    client.messages.create(
+                    logger.info("🔄 Testing client with simple API call...")
+                    response = client.messages.create(
                         model="claude-3-haiku-20240307", 
                         max_tokens=10, 
                         messages=[{"role": "user", "content": "Hi"}]
                     )
-                    logger.info("✅ Anthropic client initialized and tested")
+                    logger.info("✅ Pattern 1 SUCCESS: Modern client initialized and tested")
                     return client
                 except Exception as test_error:
-                    logger.warning(f"⚠️ Client created but test failed: {test_error}")
-                    return client  # Return anyway, might work for actual use
-
+                    logger.warning(f"⚠️ Pattern 1: Client created but test failed: {test_error}")
+                    logger.warning(f"⚠️ Pattern 1: Test error type: {type(test_error).__name__}")
+                    # Still return client as it might work for actual use
+                    return client
+                    
+            except TypeError as te:
+                logger.error(f"❌ Pattern 1 FAILED: TypeError during initialization: {te}")
+                logger.error(f"❌ Pattern 1: Error type: {type(te).__name__}")
             except Exception as e:
-                logger.error(f"❌ Anthropic client initialization failed: {e}")
+                logger.error(f"❌ Pattern 1 FAILED: {type(e).__name__}: {e}")
 
+            # Pattern 2: Try with explicit timeout (some versions require this)
+            try:
+                logger.info("🔄 Attempting Pattern 2: With explicit timeout")
+                client = anthropic.Anthropic(
+                    api_key=api_key,
+                    timeout=30.0
+                )
+                logger.info("✅ Pattern 2 SUCCESS: Client with timeout initialized")
+                return client
             except Exception as e:
-                logger.error(f"❌ Anthropic client creation failed: {e}")
+                logger.error(f"❌ Pattern 2 FAILED: {type(e).__name__}: {e}")
 
+            # Pattern 3: Minimal parameters only
+            try:
+                logger.info("🔄 Attempting Pattern 3: Minimal parameters")
+                client = anthropic.Anthropic(api_key)
+                logger.info("✅ Pattern 3 SUCCESS: Minimal client initialized")
+                return client
+            except Exception as e:
+                logger.error(f"❌ Pattern 3 FAILED: {type(e).__name__}: {e}")
+
+            # Pattern 4: Try legacy Client class if available
+            try:
+                logger.info("🔄 Attempting Pattern 4: Legacy Client class")
+                if hasattr(anthropic, 'Client'):
+                    client = anthropic.Client(api_key=api_key)
+                    logger.info("✅ Pattern 4 SUCCESS: Legacy Client initialized")
+                    return client
+                else:
+                    logger.info("ℹ️ Pattern 4: Legacy Client class not available")
+            except Exception as e:
+                logger.error(f"❌ Pattern 4 FAILED: {type(e).__name__}: {e}")
+
+            # Pattern 5: Environment variable fallback
+            try:
+                logger.info("🔄 Attempting Pattern 5: Environment variable fallback")
+                os.environ['ANTHROPIC_API_KEY'] = api_key
+                client = anthropic.Anthropic()
+                logger.info("✅ Pattern 5 SUCCESS: Environment variable client initialized")
+                return client
+            except Exception as e:
+                logger.error(f"❌ Pattern 5 FAILED: {type(e).__name__}: {e}")
+
+            logger.error("❌ ALL PATTERNS FAILED: Could not initialize Anthropic client")
             return None
 
-        except ImportError:
-            logger.error("❌ Anthropic library not installed. Install with: pip install anthropic")
+        except ImportError as ie:
+            logger.error(f"❌ Anthropic library not installed: {ie}")
+            logger.error("❌ Install with: pip install anthropic==0.8.1")
             return None
         except Exception as e:
-            logger.error(f"❌ Unexpected error initializing Claude: {e}")
+            logger.error(f"❌ Unexpected error initializing Claude: {type(e).__name__}: {e}")
+            logger.error(f"❌ Error details: {str(e)}")
+            import traceback
+            logger.error(f"❌ Full traceback: {traceback.format_exc()}")
             return None
 
     def query(self, question: str, k: int = 5) -> Dict[str, Any]:
@@ -188,8 +256,12 @@ Important: When citing sources, do not include any page references like "page X 
 If the information needed to answer the question is not in the context, please say "I cannot find this information in the lease document."
 """
 
-            # Modern API call (v0.8.0+)
+            # Modern API call with enhanced error handling
             try:
+                logger.info(f"🔍 DEBUG: Making API call to Claude...")
+                logger.info(f"🔍 DEBUG: Client type: {type(self.client).__name__}")
+                logger.info(f"🔍 DEBUG: Model: claude-3-5-sonnet-20241022")
+                
                 response = self.client.messages.create(
                     model="claude-3-5-sonnet-20241022",
                     max_tokens=1000,
@@ -197,23 +269,40 @@ If the information needed to answer the question is not in the context, please s
                     system=self.system_prompt,
                     messages=[{"role": "user", "content": user_message}]
                 )
+                
+                logger.info(f"🔍 DEBUG: Response received, type: {type(response).__name__}")
 
-                # Handle response format
+                # Handle response format with detailed debugging
                 if hasattr(response, "content") and len(response.content) > 0:
+                    logger.info(f"🔍 DEBUG: Response has content, length: {len(response.content)}")
                     if hasattr(response.content[0], "text"):
                         answer = response.content[0].text.strip()
+                        logger.info(f"🔍 DEBUG: Extracted text answer, length: {len(answer)}")
                     else:
                         # Handle different response formats
                         answer = str(response.content[0]).strip()
+                        logger.info(f"🔍 DEBUG: Converted content to string, length: {len(answer)}")
                 else:
                     answer = str(response).strip()
+                    logger.info(f"🔍 DEBUG: Used full response as string, length: {len(answer)}")
 
                 logger.info("✅ API call successful")
                 return answer
 
             except Exception as api_error:
-                logger.error(f"❌ API call failed: {api_error}")
-                return "I found relevant information but couldn't generate a response due to an API error."
+                logger.error(f"❌ API call failed: {type(api_error).__name__}: {api_error}")
+                logger.error(f"❌ API error details: {str(api_error)}")
+                
+                # Try to provide more specific error information
+                if hasattr(api_error, 'status_code'):
+                    logger.error(f"❌ HTTP status code: {api_error.status_code}")
+                if hasattr(api_error, 'response'):
+                    logger.error(f"❌ Response content: {api_error.response}")
+                    
+                import traceback
+                logger.error(f"❌ API call traceback: {traceback.format_exc()}")
+                
+                return f"I found relevant information but couldn't generate a response due to an API error: {type(api_error).__name__}: {str(api_error)}"
 
         except Exception as e:
             logger.error(f"❌ Claude API call failed: {e}")
@@ -531,7 +620,7 @@ def test_rag_assistant():
 
     # Mock vector store for testing
     class MockVectorStore:
-        def search(self, query, k=5):
+        def search(self, query, k=5):  # pylint: disable=unused-argument
             return [
                 {
                     "text": "Monthly rent is $2,000 per month, due on the 1st of each month. Late fees of $50 apply after the 5th day.",
