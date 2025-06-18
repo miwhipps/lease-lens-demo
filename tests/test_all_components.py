@@ -66,8 +66,8 @@ def create_test_lease_text():
 
     # Create a temporary text file
     test_text_path = "test_lease_document.txt"
-    with open(test_text_path, 'w') as f:
-        f.write('\n'.join(lease_text))
+    with open(test_text_path, "w") as f:
+        f.write("\n".join(lease_text))
 
     print(f"✅ Test lease text file created: {test_text_path}")
     return test_text_path
@@ -82,18 +82,18 @@ def test_mock_ocr_pipeline():
     from ocr_pipeline.textract_extract import MockTextractExtractor
 
     extractor = MockTextractExtractor()
-    
+
     # Read the text file content to simulate OCR result
-    with open(test_text_file, 'r') as f:
+    with open(test_text_file, "r") as f:
         test_content = f.read()
-    
+
     # Create mock result structure
     result = {
         "text": test_content,
         "confidence": 95.0,
         "success": True,
-        "line_count": len(test_content.split('\n')),
-        "character_count": len(test_content)
+        "line_count": len(test_content.split("\n")),
+        "character_count": len(test_content),
     }
 
     assert result is not None
@@ -105,7 +105,7 @@ def test_mock_ocr_pipeline():
     # Clean up test file
     if os.path.exists(test_text_file):
         os.remove(test_text_file)
-        
+
     return True
 
 
@@ -321,7 +321,7 @@ def main():
         vs = LeaseVectorStore()
         sample_text = "Monthly rent is $2,500. Security deposit is $5,000. No pets allowed."
         vs.add_document(sample_text, "test_doc", {"source": "test"})
-        
+
         test_rag_assistant(vs)
         test_results.append(("RAG Assistant", True))
 
