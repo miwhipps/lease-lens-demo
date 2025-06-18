@@ -153,39 +153,6 @@ def main():
     create_footer()
 
 
-def inject_button_styling():
-    """Add CSS for consistent sample query button heights"""
-    st.markdown("""
-    <style>
-    /* Sample query button styling */
-    div[data-testid="column"] > div > div > button {
-        min-height: 60px !important;
-        height: auto !important;
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        text-align: center !important;
-        padding: 0.75rem 1rem !important;
-        line-height: 1.3 !important;
-    }
-    
-    /* Ensure button text wraps properly */
-    div[data-testid="column"] > div > div > button > div {
-        width: 100% !important;
-        text-align: center !important;
-    }
-    
-    /* Optional: Add hover effect for better UX */
-    div[data-testid="column"] > div > div > button:hover {
-        transform: translateY(-2px);
-        transition: all 0.2s ease;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
 
 def apply_custom_styling():
     """Load external CSS stylesheet with theme-aware styling"""
@@ -383,11 +350,7 @@ def create_system_status():
 
 
 def create_sample_queries():
-    """Create sample query buttons with consistent sizing"""
-    
-    # Inject button styling
-    inject_button_styling()
-    
+    """Create sample query buttons"""
     st.markdown("### 💡 Try These Questions")
 
     sample_queries = [
@@ -1181,32 +1144,10 @@ def show_welcome_screen():
     """Show welcome screen with equal height feature cards"""
     st.markdown("## 👋 Welcome to LeaseLens!")
 
-    # Add CSS for perfect alignment and optimized text fit
+    # Add CSS specifically for feature cards only
     st.markdown("""
     <style>
-    /* Optimized height layout for welcome screen text content */
-    .block-container .stColumns {
-        display: flex !important;
-        align-items: stretch !important;
-        gap: 1rem !important;
-        min-height: 200px !important;
-    }
-    
-    .block-container .stColumns > div[data-testid="column"] {
-        flex: 1 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        min-height: 200px !important;
-    }
-    
-    .block-container .stColumns > div[data-testid="column"] > div {
-        min-height: 200px !important;
-        display: flex !important;
-        flex-direction: column !important;
-        flex: 1 !important;
-    }
-    
-    /* Optimized feature cards for better text fit */
+    /* Feature card specific styling - no column interference */
     .feature-card {
         height: 200px !important;
         min-height: 200px !important;
@@ -1216,7 +1157,7 @@ def show_welcome_screen():
         padding: 1.25rem !important;
     }
     
-    /* Better text spacing in cards */
+    /* Feature card text styling */
     .feature-card h4 {
         margin-bottom: 0.75rem !important;
         font-size: 1.1rem !important;
