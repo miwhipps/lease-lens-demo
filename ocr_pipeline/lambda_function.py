@@ -167,18 +167,19 @@ def create_error_response(status_code: int, message: str) -> Dict[str, Any]:
 
 # Local testing function
 def test_lambda_locally():
-    """Test the Lambda function locally"""
-    import cv2
-    import numpy as np
-
-    # Create a test image
-    img = np.ones((200, 400, 3), dtype=np.uint8) * 255
-    cv2.putText(img, "Monthly Rent: $2,000", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-    cv2.putText(img, "Security Deposit: $4,000", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-
-    # Encode as base64
-    _, buffer = cv2.imencode(".png", img)
-    image_base64 = base64.b64encode(buffer).decode("utf-8")
+    """Test the Lambda function locally without opencv"""
+    # Create test text content instead of image
+    test_text_content = """
+Monthly Rent: $2,000
+Security Deposit: $4,000
+Lease Duration: 12 months
+Pet Policy: No pets allowed
+"""
+    
+    # Create a simple mock image as base64 (minimal PNG header + data)
+    # This is just for testing - in production, real images would be provided
+    mock_png_bytes = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x00\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    image_base64 = base64.b64encode(mock_png_bytes).decode("utf-8")
 
     # Create test event
     test_event = {"body": {"image_base64": image_base64, "options": {}}}

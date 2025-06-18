@@ -1,10 +1,9 @@
 import boto3
 import json
-import numpy as np
-import cv2
 from io import BytesIO
 import logging
 import os
+# NOTE: opencv (cv2) dependency removed for minimal deployment
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,7 +54,7 @@ class TextractExtractor:
 
             # Combine text
             full_text = "\n".join(extracted_text)
-            avg_confidence = np.mean(confidence_scores) if confidence_scores else 0
+            avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
 
             result = {
                 "text": full_text,
@@ -228,20 +227,21 @@ class TextractExtractor:
             return self._create_mock_extraction(file_path)
 
     def _process_image_file(self, file_path, preprocess=True):
-        """Process image file with optional preprocessing"""
+        """Process image file with simplified handling (no opencv)"""
         try:
             if preprocess:
-                logger.info("🔧 Applying image preprocessing...")
+                logger.info("🔧 Validating image file...")
                 from .preprocess import DocumentPreprocessor
 
                 preprocessor = DocumentPreprocessor()
-                processed_img = preprocessor.enhance_document(file_path)
+                # The preprocessor now just validates the file and returns the path
+                processed_path = preprocessor.enhance_document(file_path)
+                
+                # Read the file directly (AWS Textract handles image processing)
+                with open(processed_path, "rb") as f:
+                    image_bytes = f.read()
 
-                # Convert processed image to bytes
-                _, buffer = cv2.imencode(".png", processed_img)
-                image_bytes = buffer.tobytes()
-
-                logger.info("✅ Image preprocessing completed")
+                logger.info("✅ Image validation completed")
             else:
                 logger.info("📁 Reading image file directly...")
                 with open(file_path, "rb") as f:
