@@ -326,6 +326,32 @@ def create_sidebar():
             if uploaded_file:
                 st.success(f"✅ File uploaded: {uploaded_file.name}")
                 st.session_state.processing_status["file_uploaded"] = True
+                
+                # 🔍 DEBUGGING: Comprehensive file info
+                with st.expander("🔍 Debug: File Upload Details", expanded=False):
+                    st.write("**📁 File Information:**")
+                    st.write(f"• Name: `{uploaded_file.name}`")
+                    st.write(f"• Size: `{uploaded_file.size:,} bytes` ({uploaded_file.size / 1024:.1f} KB)")
+                    st.write(f"• Type: `{uploaded_file.type}`")
+                    
+                    # Show file preview if possible
+                    if uploaded_file.type.startswith('image/') and PIL_AVAILABLE and Image is not None:
+                        st.write("**🖼️ Image Preview:**")
+                        try:
+                            image = Image.open(uploaded_file)
+                            st.image(image, caption=f'Preview: {uploaded_file.name}', use_column_width=True)
+                            st.write(f"• Image dimensions: {image.size[0]} x {image.size[1]} pixels")
+                            st.write(f"• Image mode: {image.mode}")
+                        except Exception as e:
+                            st.error(f"Could not display image preview: {e}")
+                    elif uploaded_file.type == 'application/pdf':
+                        st.write("**📄 PDF File Detected**")
+                        st.info("PDF preview not available - will be processed by OCR engine")
+                    else:
+                        st.warning(f"Unknown file type: {uploaded_file.type}")
+                    
+                    # Reset file pointer after preview
+                    uploaded_file.seek(0)
 
                 # Processing options
                 with st.expander("⚙️ Processing Options", expanded=True):
@@ -454,9 +480,23 @@ def process_document(uploaded_file, use_preprocessing, chunk_size, search_k):
         try:
             # Step 1: Save uploaded file
             status_text.info("📁 Saving uploaded file...")
+            
+            # 🔍 DEBUGGING: File processing details
+            st.write("🔍 **Debug: File Processing Start**")
+            st.write(f"• Original filename: `{uploaded_file.name}`")
+            st.write(f"• File size: `{uploaded_file.size:,} bytes`")
+            st.write(f"• File type: `{uploaded_file.type}`")
+            st.write(f"• Preprocessing enabled: `{use_preprocessing}`")
+            st.write(f"• Chunk size: `{chunk_size}`")
+            st.write(f"• Search K: `{search_k}`")
+            
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                tmp_file.write(uploaded_file.getvalue())
+                file_content = uploaded_file.getvalue()
+                tmp_file.write(file_content)
                 tmp_path = tmp_file.name
+            
+            st.write(f"• Temp file created: `{tmp_path}`")
+            st.write(f"• Temp file size: `{os.path.getsize(tmp_path):,} bytes`")
 
             progress_bar.progress(10)
             elapsed = time.time() - start_time
@@ -465,15 +505,24 @@ def process_document(uploaded_file, use_preprocessing, chunk_size, search_k):
             # Step 2: Initialize OCR components
             status_text.info("🔧 Initializing OCR components...")
 
+            # 🔍 DEBUGGING: OCR initialization
+            st.write("🔍 **Debug: OCR Engine Selection**")
+            
             # Try to use real Textract, fall back to mock if needed
             try:
                 extractor = TextractExtractor()
                 ocr_type = "AWS Textract"
+                st.write(f"✅ Successfully initialized: **{ocr_type}**")
+                st.write("• Using real AWS Textract service")
+                st.write("• Supports PDF and image processing")
             except Exception as e:
                 # Mock extractor for demo
                 extractor = create_mock_extractor()
                 ocr_type = "Mock OCR (Demo)"
                 st.warning(f"⚠️ Using mock OCR: {str(e)[:100]}...")
+                st.write(f"⚠️ Fallback to: **{ocr_type}**")
+                st.write("• Using simulated extraction for demo")
+                st.write(f"• Error details: `{str(e)}`")
 
             progress_bar.progress(25)
             elapsed = time.time() - start_time
@@ -481,12 +530,38 @@ def process_document(uploaded_file, use_preprocessing, chunk_size, search_k):
 
             # Step 3: Extract text
             status_text.info(f"🔍 Extracting text with {ocr_type}...")
-
+            
+            # 🔍 DEBUGGING: Pre-extraction info
+            st.write("🔍 **Debug: OCR Processing**")
+            st.write(f"• OCR Engine: **{ocr_type}**")
+            st.write(f"• Input file: `{tmp_path}`")
+            st.write(f"• Preprocessing: `{use_preprocessing}`")
+            st.write(f"• OpenCV available: `{OPENCV_AVAILABLE}`")
+            
             if hasattr(extractor, "extract_from_file"):
+                st.write("• Using `extract_from_file` method")
                 extraction_result = extractor.extract_from_file(tmp_path, preprocess=use_preprocessing)
             else:
-                # Mock extraction
+                st.write("• Using `extract_text` method (mock)")
                 extraction_result = extractor.extract_text()
+                
+            # 🔍 DEBUGGING: Post-extraction results
+            st.write("🔍 **Debug: OCR Results**")
+            extracted_text = extraction_result.get("text", "")
+            confidence = extraction_result.get("confidence", 0)
+            
+            st.write(f"• Text extracted: `{len(extracted_text)} characters`")
+            st.write(f"• Word count: `{len(extracted_text.split())} words`")
+            st.write(f"• Confidence: `{confidence:.1f}%`")
+            st.write(f"• Contains 'rent': `{'rent' in extracted_text.lower()}`")
+            st.write(f"• Contains '$': `{'$' in extracted_text}`")
+            st.write(f"• Is mock extraction: `{extraction_result.get('mock_extraction', False)}`")
+            
+            if len(extracted_text) > 0:
+                st.write("**📝 First 300 characters:**")
+                st.code(extracted_text[:300] + ("..." if len(extracted_text) > 300 else ""))
+            else:
+                st.error("❌ No text was extracted from the document!")
 
             st.session_state.extraction_result = extraction_result
             st.session_state.processing_status["ocr_completed"] = True
@@ -499,15 +574,38 @@ def process_document(uploaded_file, use_preprocessing, chunk_size, search_k):
             rent_keywords = ["rent", "monthly", "$", "£", "payment"]
             found_keywords = [kw for kw in rent_keywords if kw.lower() in extracted_text.lower()]
 
+            # Enhanced debug info for persistent display
             st.session_state.debug_info = {
+                "processing_time": time.time() - start_time,
+                "file_info": {
+                    "name": uploaded_file.name,
+                    "size_bytes": uploaded_file.size,
+                    "type": uploaded_file.type,
+                    "temp_path": tmp_path,
+                    "temp_size": os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0
+                },
                 "ocr_engine": ocr_type,
-                "confidence": confidence,
-                "characters_extracted": len(extracted_text),
-                "words_extracted": len(extracted_text.split()),
-                "pages_processed": extraction_result.get("page_count", 1),
-                "multi_page": extraction_result.get("multi_page_extraction", False),
-                "rent_keywords_found": found_keywords,
-                "extracted_text_preview": extracted_text[:300] + "..." if len(extracted_text) > 300 else extracted_text,
+                "preprocessing": {
+                    "enabled": use_preprocessing,
+                    "opencv_available": OPENCV_AVAILABLE,
+                },
+                "extraction_results": {
+                    "confidence": confidence,
+                    "characters_extracted": len(extracted_text),
+                    "words_extracted": len(extracted_text.split()),
+                    "pages_processed": extraction_result.get("page_count", 1),
+                    "multi_page": extraction_result.get("multi_page_extraction", False),
+                    "is_mock": extraction_result.get("mock_extraction", False),
+                    "textract_debug": extraction_result.get("debug_info", {}),
+                },
+                "content_analysis": {
+                    "rent_keywords_found": found_keywords,
+                    "has_dollar_signs": "$" in extracted_text,
+                    "has_numbers": any(char.isdigit() for char in extracted_text),
+                    "word_density": len(extracted_text.split()) / len(extracted_text) if len(extracted_text) > 0 else 0,
+                },
+                "extracted_text_preview": extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text,
+                "full_text_length": len(extracted_text)
             }
 
             progress_bar.progress(50)
@@ -752,35 +850,93 @@ Professional cleaning required at end of tenancy: £200"""
 
 
 def display_debug_info():
-    """Display persistent debug information"""
+    """Display comprehensive debug information"""
     if "debug_info" in st.session_state or "chunk_debug_info" in st.session_state:
-        with st.expander("🔍 Document Processing Debug Info", expanded=False):
+        with st.expander("🔍 COMPREHENSIVE DEBUG INFORMATION", expanded=False):
             if "debug_info" in st.session_state:
                 debug = st.session_state.debug_info
-                st.write("### OCR Extraction Results")
+                
+                # File Information Section
+                st.write("### 📁 File Information")
+                file_info = debug.get("file_info", {})
                 col1, col2 = st.columns(2)
-
+                
                 with col1:
-                    st.metric("OCR Engine", debug["ocr_engine"])
-                    st.metric("Confidence", f"{debug['confidence']}%")
-                    st.metric("Characters", debug["characters_extracted"])
-
+                    st.write(f"**Original File:**")
+                    st.write(f"• Name: `{file_info.get('name', 'Unknown')}`")
+                    st.write(f"• Size: `{file_info.get('size_bytes', 0):,} bytes`")
+                    st.write(f"• Type: `{file_info.get('type', 'Unknown')}`")
+                
                 with col2:
-                    st.metric("Words", debug["words_extracted"])
-                    st.metric("Pages Processed", debug.get("pages_processed", 1))
-                    if debug.get("multi_page", False):
-                        st.success("✅ Multi-page processing")
+                    st.write(f"**Temp File:**")
+                    st.write(f"• Path: `{file_info.get('temp_path', 'Unknown')}`")
+                    st.write(f"• Size: `{file_info.get('temp_size', 0):,} bytes`")
+                    st.write(f"• Processing time: `{debug.get('processing_time', 0):.2f}s`")
+
+                # OCR Engine Information
+                st.write("### 🔧 OCR Engine Details")
+                preprocessing = debug.get("preprocessing", {})
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.metric("OCR Engine", debug.get("ocr_engine", "Unknown"))
+                    st.write(f"• Preprocessing enabled: `{preprocessing.get('enabled', False)}`")
+                    st.write(f"• OpenCV available: `{preprocessing.get('opencv_available', False)}`")
+                
+                with col2:
+                    extraction = debug.get("extraction_results", {})
+                    st.metric("Confidence", f"{extraction.get('confidence', 0):.1f}%")
+                    st.write(f"• Is mock extraction: `{extraction.get('is_mock', False)}`")
+                    st.write(f"• Multi-page: `{extraction.get('multi_page', False)}`")
+
+                # Extraction Results
+                st.write("### 📊 Extraction Results")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Characters", f"{extraction.get('characters_extracted', 0):,}")
+                    st.metric("Words", f"{extraction.get('words_extracted', 0):,}")
+                
+                with col2:
+                    st.metric("Pages", extraction.get('pages_processed', 1))
+                    content = debug.get("content_analysis", {})
+                    word_density = content.get('word_density', 0)
+                    st.metric("Word Density", f"{word_density:.3f}")
+                
+                with col3:
+                    st.write("**Content Flags:**")
+                    if content.get('has_dollar_signs', False):
+                        st.success("✅ Has $ signs")
                     else:
-                        st.info("ℹ️ Single page processing")
+                        st.error("❌ No $ signs")
+                    
+                    if content.get('has_numbers', False):
+                        st.success("✅ Has numbers")
+                    else:
+                        st.error("❌ No numbers")
 
-                st.write("**Rent Keywords Found:**")
-                if debug["rent_keywords_found"]:
-                    st.success(f"✅ {debug['rent_keywords_found']}")
+                # Keywords Analysis
+                st.write("### 🔍 Content Analysis")
+                keywords = content.get("rent_keywords_found", [])
+                if keywords:
+                    st.success(f"✅ **Rent keywords found:** {', '.join(keywords)}")
                 else:
-                    st.error("❌ No rent keywords found!")
+                    st.error("❌ **No rent keywords found!** This indicates a potential OCR problem.")
 
-                st.write("**Extracted Text Preview:**")
-                st.code(debug["extracted_text_preview"])
+                # Textract Debug Info (if available)
+                textract_debug = extraction.get("textract_debug", {})
+                if textract_debug:
+                    st.write("### 🔬 AWS Textract Debug")
+                    st.json(textract_debug)
+
+                # Text Preview
+                st.write("### 📝 Extracted Text Preview")
+                preview_text = debug.get("extracted_text_preview", "")
+                if preview_text:
+                    st.code(preview_text, language="text")
+                    st.write(f"**Full text length:** {debug.get('full_text_length', 0):,} characters")
+                else:
+                    st.error("❌ NO TEXT EXTRACTED! This is a critical problem.")
 
             if "chunk_debug_info" in st.session_state:
                 chunk_debug = st.session_state.chunk_debug_info

@@ -75,18 +75,28 @@ class TextractExtractor:
 
     def extract_from_file(self, file_path, preprocess=True):
         """Extract text from file with PDF conversion support"""
-        logger.info(f"📄 Processing file: {file_path}")
+        logger.info(f"🔍 DEBUG: Starting file extraction")
+        logger.info(f"🔍 DEBUG:   File path: {file_path}")
+        logger.info(f"🔍 DEBUG:   File exists: {os.path.exists(file_path)}")
+        
+        if os.path.exists(file_path):
+            file_size = os.path.getsize(file_path)
+            logger.info(f"🔍 DEBUG:   File size: {file_size:,} bytes")
+        
+        logger.info(f"🔍 DEBUG:   Preprocessing enabled: {preprocess}")
 
         try:
             # Check file extension
             file_ext = os.path.splitext(file_path)[1].lower()
+            logger.info(f"🔍 DEBUG:   File extension: {file_ext}")
 
             if file_ext == ".pdf":
+                logger.info("🔍 DEBUG:   Detected PDF file - using PDF processing")
                 # Try PDF processing with fallback to image conversion
                 return self._process_pdf_with_fallback(file_path)
             else:
+                logger.info("🔍 DEBUG:   Detected image file - using image processing")
                 # Handle image files
-                logger.info("🖼️ Processing image file...")
                 return self._process_image_file(file_path, preprocess)
 
         except Exception as e:

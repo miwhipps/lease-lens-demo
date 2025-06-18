@@ -31,40 +31,71 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         else:
             body = event.get("body", {})
 
-        logger.info(f"Processing OCR request with body keys: {list(body.keys())}")
-
+        # 🔍 DEBUGGING: Comprehensive input analysis
+        logger.info(f"🔍 DEBUG: Processing OCR request")
+        logger.info(f"🔍 DEBUG: Event keys: {list(event.keys())}")
+        logger.info(f"🔍 DEBUG: Body keys: {list(body.keys())}")
+        logger.info(f"🔍 DEBUG: Body type: {type(body)}")
+        
         # Validate input
         if "image_base64" not in body:
+            logger.error("🔍 DEBUG: Missing 'image_base64' in request body")
             return create_error_response(400, "Missing 'image_base64' in request body")
 
-        # Decode image data
+        # Decode image data with detailed logging
         try:
-            image_data = base64.b64decode(body["image_base64"])
-            logger.info(f"Decoded image data: {len(image_data)} bytes")
+            base64_data = body["image_base64"]
+            logger.info(f"🔍 DEBUG: Base64 data length: {len(base64_data)} characters")
+            logger.info(f"🔍 DEBUG: Base64 preview: {base64_data[:50]}...")
+            
+            image_data = base64.b64decode(base64_data)
+            logger.info(f"🔍 DEBUG: Decoded image data: {len(image_data)} bytes")
+            
+            # Check for valid image headers
+            if image_data.startswith(b'\x89PNG'):
+                logger.info("🔍 DEBUG: Detected PNG image format")
+            elif image_data.startswith(b'\xff\xd8\xff'):
+                logger.info("🔍 DEBUG: Detected JPEG image format")
+            elif image_data.startswith(b'%PDF'):
+                logger.info("🔍 DEBUG: Detected PDF format")
+            else:
+                logger.warning(f"🔍 DEBUG: Unknown file format, first 10 bytes: {image_data[:10]}")
+                
         except Exception as e:
+            logger.error(f"🔍 DEBUG: Base64 decode error: {str(e)}")
             return create_error_response(400, f"Invalid base64 image data: {str(e)}")
 
-        # Get processing options
+        # Get processing options with debugging
         options = body.get("options", {})
         feature_types = options.get("feature_types", [])
+        logger.info(f"🔍 DEBUG: Processing options: {options}")
+        logger.info(f"🔍 DEBUG: Feature types: {feature_types}")
 
         # Initialize Textract client
+        logger.info("🔍 DEBUG: Initializing Textract client")
         textract = boto3.client("textract")
+        logger.info("🔍 DEBUG: Textract client initialized successfully")
 
         # Choose Textract operation based on feature types
         if feature_types:
             # Use analyze_document for advanced features
-            response = textract.analyze_document(Document={"Bytes": image_data}, FeatureTypes=feature_types)
             operation = "analyze_document"
+            logger.info(f"🔍 DEBUG: Using {operation} with features: {feature_types}")
+            response = textract.analyze_document(Document={"Bytes": image_data}, FeatureTypes=feature_types)
         else:
             # Use detect_document_text for basic OCR
-            response = textract.detect_document_text(Document={"Bytes": image_data})
             operation = "detect_document_text"
+            logger.info(f"🔍 DEBUG: Using {operation} for basic text extraction")
+            response = textract.detect_document_text(Document={"Bytes": image_data})
 
-        logger.info(f"Textract {operation} completed successfully")
+        logger.info(f"🔍 DEBUG: Textract {operation} completed successfully")
+        logger.info(f"🔍 DEBUG: Response contains {len(response.get('Blocks', []))} blocks")
 
         # Process response
+        logger.info("🔍 DEBUG: Processing Textract response")
         result = process_textract_response(response, operation)
+        logger.info(f"🔍 DEBUG: Extracted {len(result.get('text', ''))} characters")
+        logger.info(f"🔍 DEBUG: Confidence: {result.get('confidence', 0):.1f}%")
 
         return create_success_response(result)
 
@@ -77,6 +108,14 @@ def process_textract_response(response: Dict[str, Any], operation: str) -> Dict[
     """Process Textract response and extract relevant information"""
 
     blocks = response.get("Blocks", [])
+    logger.info(f"🔍 DEBUG: Processing {len(blocks)} blocks from Textract response")
+    
+    # Count block types for debugging
+    block_types = {}
+    for block in blocks:
+        block_type = block.get("BlockType", "UNKNOWN")
+        block_types[block_type] = block_types.get(block_type, 0) + 1
+    logger.info(f"🔍 DEBUG: Block types found: {block_types}")
 
     # Extract text content
     lines = []
@@ -114,6 +153,25 @@ def process_textract_response(response: Dict[str, Any], operation: str) -> Dict[
     # Combine extracted text
     full_text = "\n".join(lines)
     avg_confidence = sum(confidence_scores) / len(confidence_scores) if confidence_scores else 0
+    
+    # 🔍 DEBUGGING: Final extraction results
+    logger.info(f"🔍 DEBUG: Text extraction summary:")
+    logger.info(f"🔍 DEBUG:   Lines extracted: {len(lines)}")
+    logger.info(f"🔍 DEBUG:   Words extracted: {len(words)}")
+    logger.info(f"🔍 DEBUG:   Total characters: {len(full_text)}")
+    logger.info(f"🔍 DEBUG:   Average confidence: {avg_confidence:.1f}%")
+    logger.info(f"🔍 DEBUG:   Form fields found: {len(forms)}")
+    logger.info(f"🔍 DEBUG:   Tables found: {len(tables)}")
+    
+    # Check for key lease terms in extracted text
+    rent_indicators = ["rent", "monthly", "$", "payment", "lease"]
+    found_indicators = [term for term in rent_indicators if term.lower() in full_text.lower()]
+    logger.info(f"🔍 DEBUG:   Lease indicators found: {found_indicators}")
+    
+    if len(full_text) > 0:
+        logger.info(f"🔍 DEBUG:   First 200 chars: {full_text[:200]}")
+    else:
+        logger.warning("🔍 DEBUG:   NO TEXT EXTRACTED - This is a problem!")
 
     # Prepare result
     result = {
@@ -128,6 +186,11 @@ def process_textract_response(response: Dict[str, Any], operation: str) -> Dict[
         },
         "operation": operation,
         "success": True,
+        "debug_info": {
+            "block_types": block_types,
+            "lease_indicators": found_indicators,
+            "extraction_quality": "good" if len(full_text) > 100 else "poor"
+        }
     }
 
     # Add detailed information if requested
