@@ -3,14 +3,46 @@ import tempfile
 import os
 import time
 import json
-from PIL import Image
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 from datetime import datetime
-import cv2
-import numpy as np
 from dotenv import load_dotenv
+
+# Optional imports with graceful fallbacks
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    Image = None
+
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    pd = None
+
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    PLOTLY_AVAILABLE = True
+except ImportError:
+    PLOTLY_AVAILABLE = False
+    px = None
+    go = None
+
+try:
+    import cv2
+    OPENCV_AVAILABLE = True
+except ImportError:
+    OPENCV_AVAILABLE = False
+    cv2 = None
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    np = None
 
 # Load environment variables
 load_dotenv()
@@ -1003,26 +1035,38 @@ def create_analytics_panel():
             st.markdown("### 📈 Processing Quality")
 
             confidence = stats["confidence"]
-            fig = go.Figure(
-                go.Indicator(
-                    mode="gauge+number",
-                    value=confidence,
-                    domain={"x": [0, 1], "y": [0, 1]},
-                    title={"text": "OCR Confidence %"},
-                    gauge={
-                        "axis": {"range": [None, 100]},
-                        "bar": {"color": "darkblue"},
-                        "steps": [
-                            {"range": [0, 60], "color": "lightgray"},
-                            {"range": [60, 80], "color": "yellow"},
-                            {"range": [80, 100], "color": "green"},
-                        ],
-                        "threshold": {"line": {"color": "red", "width": 4}, "thickness": 0.75, "value": 90},
-                    },
+            if PLOTLY_AVAILABLE and go is not None:
+                fig = go.Figure(
+                    go.Indicator(
+                        mode="gauge+number",
+                        value=confidence,
+                        domain={"x": [0, 1], "y": [0, 1]},
+                        title={"text": "OCR Confidence %"},
+                        gauge={
+                            "axis": {"range": [None, 100]},
+                            "bar": {"color": "darkblue"},
+                            "steps": [
+                                {"range": [0, 60], "color": "lightgray"},
+                                {"range": [60, 80], "color": "yellow"},
+                                {"range": [80, 100], "color": "green"},
+                            ],
+                            "threshold": {"line": {"color": "red", "width": 4}, "thickness": 0.75, "value": 90},
+                        },
+                    )
                 )
-            )
-            fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+                fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                # Fallback to simple metric display without plotly
+                st.metric("OCR Confidence", f"{confidence:.1f}%")
+                if confidence >= 90:
+                    st.success("🟢 Excellent quality")
+                elif confidence >= 80:
+                    st.info("🟡 Good quality")
+                elif confidence >= 60:
+                    st.warning("🟠 Fair quality")
+                else:
+                    st.error("🔴 Poor quality")
 
         # Conversation statistics
         if st.session_state.messages and len(st.session_state.messages) > 1:
@@ -1273,8 +1317,16 @@ def display_key_figures():
             )
 
         if financial_data:
-            df = pd.DataFrame(financial_data)
-            st.dataframe(df, use_container_width=True)
+            if PANDAS_AVAILABLE and pd is not None:
+                df = pd.DataFrame(financial_data)
+                st.dataframe(df, use_container_width=True)
+            else:
+                # Fallback to basic table display without pandas
+                st.markdown("#### Financial Terms")
+                for item in financial_data:
+                    st.markdown(f"**{item['Term']}:** {item['Amount']}")
+                    if item['Notes']:
+                        st.markdown(f"  *{item['Notes']}*")
 
     # Cost estimates
     if figures.get("summary"):

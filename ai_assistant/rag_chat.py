@@ -1,9 +1,16 @@
 import os
-import numpy as np
 from typing import Dict, List, Any
 import logging
 from dotenv import load_dotenv
 import re
+
+# Optional numpy import with graceful fallback
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    np = None
 
 # Load environment variables
 load_dotenv()
@@ -196,7 +203,11 @@ Context will be provided as numbered sources. Reference them as "Source 1", "Sou
             method = "fallback"
 
         # Calculate confidence based on retrieval scores
-        confidence = np.mean([r["score"] for r in results]) if results else 0.0
+        if NUMPY_AVAILABLE and np is not None:
+            confidence = np.mean([r["score"] for r in results]) if results else 0.0
+        else:
+            # Fallback to basic Python average calculation
+            confidence = sum(r["score"] for r in results) / len(results) if results else 0.0
 
         response = {
             "answer": answer,
