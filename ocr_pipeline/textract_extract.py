@@ -182,45 +182,7 @@ class TextractExtractor:
                     import fitz  # PyMuPDF
 
                     logger.info("🔄 Converting PDF to image using PyMuPDF...")
-                    doc = fitz.open(file_path)
-
-                    logger.info(f"📄 Processing {len(doc)} pages from PDF")
-                    all_text = ""
-                    total_confidence = 0
-                    total_lines = 0
-                    total_words = 0
-
-                    # Process each page
-                    for page_num in range(len(doc)):
-                        logger.info(f"📄 Processing page {page_num + 1}/{len(doc)}...")
-
-                        page = doc[page_num]
-                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x scale for better quality
-                        page_bytes = pix.tobytes("png")
-
-                        # Extract text from this page
-                        page_result = self.extract_text_from_image(page_bytes)
-
-                        # Accumulate results
-                        if page_result["text"].strip():
-                            all_text += f"\n--- Page {page_num + 1} ---\n" + page_result["text"] + "\n"
-                            total_confidence += page_result["confidence"]
-                            total_lines += page_result["line_count"]
-                            total_words += page_result["word_count"]
-
-                    doc.close()
-
-                    # Return combined result
-                    avg_confidence = total_confidence / len(doc) if len(doc) > 0 else 0
-
-                    return {
-                        "text": all_text.strip(),
-                        "confidence": avg_confidence,
-                        "line_count": total_lines,
-                        "word_count": total_words,
-                        "page_count": len(doc),
-                        "multi_page_extraction": True,
-                    }
+                    return self._process_pdf_with_pymupdf(file_path)
 
                 except ImportError:
                     logger.warning("⚠️ PyMuPDF not available either")
@@ -262,6 +224,166 @@ class TextractExtractor:
         except Exception as e:
             logger.error(f"❌ Image processing failed: {str(e)}")
             return self._create_mock_extraction(file_path)
+
+    def _process_pdf_with_pymupdf(self, file_path):
+        """Process PDF using PyMuPDF with proper document lifecycle management"""
+        import fitz  # PyMuPDF
+        import tempfile
+        import os
+        
+        doc = None
+        page_images = []
+        
+        try:
+            # Step 1: Open document and get page count
+            logger.info(f"🔍 DEBUG: Opening PDF document: {file_path}")
+            doc = fitz.open(file_path)
+            total_pages = len(doc)
+            logger.info(f"🔍 DEBUG: Document has {total_pages} pages")
+            
+            # Step 2: Convert ALL pages to images BEFORE processing
+            logger.info("🔄 Converting all PDF pages to images...")
+            page_images = self._convert_pdf_pages_to_images(doc, total_pages)
+            
+            # Step 3: Close document immediately after conversion
+            logger.info("🔍 DEBUG: Closing PDF document after image conversion")
+            doc.close()
+            doc = None  # Mark as closed
+            
+            # Step 4: Process each image with OCR
+            logger.info(f"🔍 Processing {len(page_images)} page images with OCR...")
+            return self._process_page_images(page_images)
+            
+        except Exception as e:
+            logger.error(f"❌ PyMuPDF processing failed: {str(e)}")
+            raise e
+            
+        finally:
+            # Always ensure document is closed
+            if doc is not None:
+                try:
+                    doc.close()
+                    logger.info("🔍 DEBUG: Document closed in finally block")
+                except:
+                    pass
+            
+            # Clean up temporary image files
+            self._cleanup_temp_images(page_images)
+
+    def _convert_pdf_pages_to_images(self, doc, total_pages):
+        """Convert all PDF pages to temporary image files"""
+        import tempfile
+        import os
+        import fitz  # PyMuPDF
+        
+        page_images = []
+        
+        try:
+            for page_num in range(total_pages):
+                logger.info(f"🔄 Converting page {page_num + 1}/{total_pages} to image")
+                
+                try:
+                    # Load and render page
+                    page = doc.load_page(page_num)
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better quality
+                    
+                    # Save to temporary file
+                    temp_image = tempfile.NamedTemporaryFile(
+                        suffix=f'_page_{page_num + 1}.png',
+                        delete=False,
+                        prefix='pymupdf_'
+                    )
+                    temp_image.close()
+                    
+                    pix.save(temp_image.name)
+                    page_images.append(temp_image.name)
+                    
+                    logger.info(f"🔍 DEBUG: Page {page_num + 1} saved as {temp_image.name}")
+                    
+                    # Clean up page resources immediately
+                    pix = None
+                    page = None
+                    
+                except Exception as e:
+                    logger.error(f"❌ Failed to convert page {page_num + 1}: {str(e)}")
+                    # Continue with other pages
+                    continue
+            
+            logger.info(f"✅ Successfully converted {len(page_images)} pages to images")
+            return page_images
+            
+        except Exception as e:
+            logger.error(f"❌ Page conversion failed: {str(e)}")
+            # Clean up any partial images
+            self._cleanup_temp_images(page_images)
+            raise e
+
+    def _process_page_images(self, page_images):
+        """Process all page images with OCR and combine results"""
+        all_text = ""
+        total_confidence = 0
+        total_lines = 0
+        total_words = 0
+        successful_pages = 0
+        
+        for i, image_path in enumerate(page_images):
+            page_num = i + 1
+            
+            try:
+                logger.info(f"🔍 OCR processing page {page_num}/{len(page_images)}")
+                
+                # Read image file as bytes for Textract
+                with open(image_path, 'rb') as f:
+                    image_bytes = f.read()
+                
+                # Extract text from this page
+                page_result = self.extract_text_from_image(image_bytes)
+                
+                # Accumulate results if successful
+                if page_result.get("text", "").strip():
+                    all_text += f"\n--- Page {page_num} ---\n" + page_result["text"] + "\n"
+                    total_confidence += page_result.get("confidence", 0)
+                    total_lines += page_result.get("line_count", 0)
+                    total_words += page_result.get("word_count", 0)
+                    successful_pages += 1
+                    logger.info(f"✅ Page {page_num} processed successfully ({len(page_result.get('text', ''))} chars)")
+                else:
+                    logger.warning(f"⚠️ Page {page_num} produced no text")
+                    all_text += f"\n--- Page {page_num} ---\n[No text extracted from this page]\n"
+                    
+            except Exception as e:
+                logger.error(f"❌ Page {page_num} OCR failed: {str(e)}")
+                all_text += f"\n--- Page {page_num} ---\n[OCR failed for this page: {str(e)}]\n"
+                continue
+        
+        # Calculate average confidence for successful pages
+        avg_confidence = total_confidence / successful_pages if successful_pages > 0 else 0
+        
+        logger.info(f"🔍 DEBUG: Multi-page processing complete:")
+        logger.info(f"🔍 DEBUG:   Total pages: {len(page_images)}")
+        logger.info(f"🔍 DEBUG:   Successful pages: {successful_pages}")
+        logger.info(f"🔍 DEBUG:   Total text length: {len(all_text)} characters")
+        logger.info(f"🔍 DEBUG:   Average confidence: {avg_confidence:.1f}%")
+        
+        return {
+            "text": all_text.strip(),
+            "confidence": avg_confidence,
+            "line_count": total_lines,
+            "word_count": total_words,
+            "page_count": len(page_images),
+            "successful_pages": successful_pages,
+            "multi_page_extraction": True,
+        }
+
+    def _cleanup_temp_images(self, page_images):
+        """Clean up temporary image files"""
+        for img_path in page_images:
+            try:
+                if os.path.exists(img_path):
+                    os.remove(img_path)
+                    logger.info(f"🔍 DEBUG: Cleaned up temp image: {img_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to clean up {img_path}: {str(e)}")
 
     def _create_mock_extraction(self, file_path):
         """Create mock extraction result for demo/fallback"""
