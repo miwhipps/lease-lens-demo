@@ -481,22 +481,10 @@ def process_document(uploaded_file, use_preprocessing, chunk_size, search_k):
             # Step 1: Save uploaded file
             status_text.info("📁 Saving uploaded file...")
             
-            # 🔍 DEBUGGING: File processing details
-            st.write("🔍 **Debug: File Processing Start**")
-            st.write(f"• Original filename: `{uploaded_file.name}`")
-            st.write(f"• File size: `{uploaded_file.size:,} bytes`")
-            st.write(f"• File type: `{uploaded_file.type}`")
-            st.write(f"• Preprocessing enabled: `{use_preprocessing}`")
-            st.write(f"• Chunk size: `{chunk_size}`")
-            st.write(f"• Search K: `{search_k}`")
-            
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                 file_content = uploaded_file.getvalue()
                 tmp_file.write(file_content)
                 tmp_path = tmp_file.name
-            
-            st.write(f"• Temp file created: `{tmp_path}`")
-            st.write(f"• Temp file size: `{os.path.getsize(tmp_path):,} bytes`")
 
             progress_bar.progress(10)
             elapsed = time.time() - start_time
@@ -504,25 +492,15 @@ def process_document(uploaded_file, use_preprocessing, chunk_size, search_k):
 
             # Step 2: Initialize OCR components
             status_text.info("🔧 Initializing OCR components...")
-
-            # 🔍 DEBUGGING: OCR initialization
-            st.write("🔍 **Debug: OCR Engine Selection**")
             
             # Try to use real Textract, fall back to mock if needed
             try:
                 extractor = TextractExtractor()
                 ocr_type = "AWS Textract"
-                st.write(f"✅ Successfully initialized: **{ocr_type}**")
-                st.write("• Using real AWS Textract service")
-                st.write("• Supports PDF and image processing")
             except Exception as e:
                 # Mock extractor for demo
                 extractor = create_mock_extractor()
                 ocr_type = "Mock OCR (Demo)"
-                st.warning(f"⚠️ Using mock OCR: {str(e)[:100]}...")
-                st.write(f"⚠️ Fallback to: **{ocr_type}**")
-                st.write("• Using simulated extraction for demo")
-                st.write(f"• Error details: `{str(e)}`")
 
             progress_bar.progress(25)
             elapsed = time.time() - start_time
@@ -531,37 +509,10 @@ def process_document(uploaded_file, use_preprocessing, chunk_size, search_k):
             # Step 3: Extract text
             status_text.info(f"🔍 Extracting text with {ocr_type}...")
             
-            # 🔍 DEBUGGING: Pre-extraction info
-            st.write("🔍 **Debug: OCR Processing**")
-            st.write(f"• OCR Engine: **{ocr_type}**")
-            st.write(f"• Input file: `{tmp_path}`")
-            st.write(f"• Preprocessing: `{use_preprocessing}`")
-            st.write(f"• OpenCV available: `{OPENCV_AVAILABLE}`")
-            
             if hasattr(extractor, "extract_from_file"):
-                st.write("• Using `extract_from_file` method")
                 extraction_result = extractor.extract_from_file(tmp_path, preprocess=use_preprocessing)
             else:
-                st.write("• Using `extract_text` method (mock)")
                 extraction_result = extractor.extract_text()
-                
-            # 🔍 DEBUGGING: Post-extraction results
-            st.write("🔍 **Debug: OCR Results**")
-            extracted_text = extraction_result.get("text", "")
-            confidence = extraction_result.get("confidence", 0)
-            
-            st.write(f"• Text extracted: `{len(extracted_text)} characters`")
-            st.write(f"• Word count: `{len(extracted_text.split())} words`")
-            st.write(f"• Confidence: `{confidence:.1f}%`")
-            st.write(f"• Contains 'rent': `{'rent' in extracted_text.lower()}`")
-            st.write(f"• Contains '$': `{'$' in extracted_text}`")
-            st.write(f"• Is mock extraction: `{extraction_result.get('mock_extraction', False)}`")
-            
-            if len(extracted_text) > 0:
-                st.write("**📝 First 300 characters:**")
-                st.code(extracted_text[:300] + ("..." if len(extracted_text) > 300 else ""))
-            else:
-                st.error("❌ No text was extracted from the document!")
 
             st.session_state.extraction_result = extraction_result
             st.session_state.processing_status["ocr_completed"] = True
@@ -849,6 +800,194 @@ Professional cleaning required at end of tenancy: £200"""
     ]
 
 
+def display_document_processing_panel():
+    """Display a professional document processing summary panel"""
+    if not ("debug_info" in st.session_state or "chunk_debug_info" in st.session_state):
+        return
+    
+    st.markdown("---")
+    st.subheader('📊 Document Processing Summary')
+    
+    debug = st.session_state.get("debug_info", {})
+    chunk_debug = st.session_state.get("chunk_debug_info", {})
+    
+    # File Information Section
+    with st.expander('📁 File Information', expanded=True):
+        file_info = debug.get("file_info", {})
+        extraction = debug.get("extraction_results", {})
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric('File Name', file_info.get('name', 'Unknown'))
+            st.metric('File Size', f"{file_info.get('size_bytes', 0):,} bytes")
+        with col2:
+            st.metric('File Type', file_info.get('type', 'Unknown'))
+            st.metric('Pages Processed', extraction.get('pages_processed', 1))
+        with col3:
+            upload_time = debug.get('processing_time', 0)
+            st.metric('Processing Time', f"{upload_time:.2f}s")
+            success = extraction.get('characters_extracted', 0) > 0
+            st.metric('Status', '✅ Processed' if success else '❌ Failed')
+    
+    # OCR Engine Details Section
+    with st.expander('🔍 OCR Engine Details'):
+        preprocessing = debug.get("preprocessing", {})
+        col1, col2 = st.columns(2)
+        with col1:
+            engine = debug.get("ocr_engine", "Unknown")
+            is_mock = extraction.get("is_mock", False)
+            engine_display = f"{engine} {'(Demo Mode)' if is_mock else '(Production)'}"
+            st.write(f'**Engine:** {engine_display}')
+            st.write(f'**Region:** us-east-1')
+            st.write(f'**Processing Method:** {"Mock Extraction" if is_mock else "AWS Textract"}')
+        with col2:
+            st.write(f'**Preprocessing:** {"✅ Enabled" if preprocessing.get("enabled") else "❌ Disabled"}')
+            st.write(f'**OpenCV Available:** {"✅ Yes" if preprocessing.get("opencv_available") else "❌ No"}')
+            confidence = extraction.get("confidence", 0)
+            if confidence >= 90:
+                conf_status = "🟢 Excellent"
+            elif confidence >= 75:
+                conf_status = "🟡 Good"
+            else:
+                conf_status = "🔴 Poor"
+            st.write(f'**Quality:** {conf_status} ({confidence:.1f}%)')
+    
+    # Extraction Results Section  
+    with st.expander('📄 Extraction Results'):
+        if extraction.get('characters_extracted', 0) > 0:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric('Characters Extracted', f"{extraction.get('characters_extracted', 0):,}")
+                st.metric('Confidence Score', f"{extraction.get('confidence', 0):.1f}%")
+            with col2:
+                st.metric('Lines Detected', extraction.get('line_count', 0))
+                st.metric('Words Extracted', f"{extraction.get('words_extracted', 0):,}")
+            with col3:
+                st.metric('Pages Processed', extraction.get('pages_processed', 1))
+                multi_page = extraction.get('multi_page', False)
+                st.metric('Multi-page', '✅ Yes' if multi_page else '❌ No')
+                
+            # Content Quality Indicators
+            st.markdown("#### 📈 Content Quality Indicators")
+            content = debug.get("content_analysis", {})
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                keywords = content.get("rent_keywords_found", [])
+                if keywords:
+                    st.success(f"✅ Keywords: {', '.join(keywords[:3])}")
+                else:
+                    st.error("❌ No rent keywords found")
+            
+            with col2:
+                if content.get("has_dollar_signs", False):
+                    st.success("✅ Currency symbols detected")
+                else:
+                    st.warning("⚠️ No currency symbols")
+            
+            with col3:
+                if content.get("has_numbers", False):
+                    st.success("✅ Numbers detected")
+                else:
+                    st.warning("⚠️ No numbers detected")
+                    
+            with col4:
+                word_density = content.get("word_density", 0)
+                if word_density > 0.05:
+                    st.success(f"✅ Good text density")
+                else:
+                    st.warning(f"⚠️ Low text density")
+        else:
+            st.error('❌ No text was extracted from the document')
+            st.write("**Possible causes:**")
+            st.write("• Document may be an image without text")
+            st.write("• OCR service may not be available") 
+            st.write("• File may be corrupted or unreadable")
+    
+    # Extracted Text Preview Section
+    with st.expander('📝 Extracted Text Preview'):
+        extracted_text = debug.get('extracted_text_preview', '')
+        full_length = debug.get('full_text_length', 0)
+        
+        if extracted_text:
+            # Show preview in a text area
+            preview_length = min(500, len(extracted_text))
+            st.text_area(
+                f'First {preview_length} characters:',
+                value=extracted_text[:preview_length] + ('...' if full_length > preview_length else ''),
+                height=150,
+                disabled=True,
+                key="text_preview"
+            )
+            
+            # Text statistics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.write(f'**Total Characters:** {full_length:,}')
+            with col2:
+                word_count = extraction.get('words_extracted', 0)
+                st.write(f'**Word Count:** {word_count:,}')
+            with col3:
+                reading_time = max(1, word_count // 200)
+                st.write(f'**Est. Reading Time:** {reading_time} min')
+                
+            # Quality assessment
+            if full_length > 1000:
+                st.success("✅ Document appears to have substantial content")
+            elif full_length > 100:
+                st.info("ℹ️ Document has moderate content")
+            else:
+                st.warning("⚠️ Document has minimal content - check OCR quality")
+        else:
+            st.warning('⚠️ No text preview available')
+    
+    # Vector Store Results Section
+    with st.expander('🗂️ Vector Store Results'):
+        if chunk_debug.get('total_chunks', 0) > 0:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric('Chunks Created', chunk_debug.get('total_chunks', 0))
+                st.metric('Embedding Model', 'TF-IDF + Sentence Transformers')
+                st.metric('Chunk Size', 'Variable (sentence-based)')
+            with col2:
+                st.metric('Total Documents', 1)
+                st.metric('Vector Store Type', 'Simple TF-IDF')
+                st.metric('Search Ready', '✅ Yes')
+                
+            # Show chunk quality analysis
+            st.markdown("#### 📊 Chunk Quality Analysis")
+            chunks = chunk_debug.get('chunks', [])
+            if chunks:
+                rent_chunks = sum(1 for chunk in chunks if chunk.get('has_rent', False))
+                money_chunks = sum(1 for chunk in chunks if chunk.get('has_money', False))
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric('Chunks with Rent Terms', rent_chunks)
+                with col2:
+                    st.metric('Chunks with Money Info', money_chunks)
+                with col3:
+                    quality_score = (rent_chunks + money_chunks) / len(chunks) * 100
+                    st.metric('Content Quality', f"{quality_score:.1f}%")
+                    
+                # Show sample chunks
+                st.markdown("#### 📝 Sample Chunks")
+                for i, chunk in enumerate(chunks[:3]):
+                    with st.container():
+                        chunk_quality = []
+                        if chunk.get('has_rent'): chunk_quality.append("🏠 Rent")
+                        if chunk.get('has_money'): chunk_quality.append("💰 Money")
+                        quality_str = " | ".join(chunk_quality) if chunk_quality else "📄 General"
+                        
+                        st.write(f"**Chunk {i+1}** ({chunk.get('words', 0)} words) - {quality_str}")
+                        st.code(chunk.get('preview', '')[:150] + ("..." if len(chunk.get('preview', '')) > 150 else ""))
+        else:
+            st.error('❌ Vector store processing failed')
+            st.write("**Possible causes:**")
+            st.write("• No text was extracted from the document")
+            st.write("• Text processing pipeline encountered an error")
+
+
 def display_debug_info():
     """Display comprehensive debug information"""
     if "debug_info" in st.session_state or "chunk_debug_info" in st.session_state:
@@ -964,8 +1103,8 @@ def create_chat_interface():
     """Create the main chat interface"""
     st.markdown("## 💬 Chat with Your Lease")
 
-    # Display debug info if available
-    display_debug_info()
+    # Display professional document processing panel
+    display_document_processing_panel()
 
     # Display chat messages
     for i, message in enumerate(st.session_state.messages):
