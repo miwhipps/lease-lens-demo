@@ -154,102 +154,42 @@ def main():
 
 
 def apply_custom_styling():
-    """Apply custom CSS styling"""
-    st.markdown(
-        """
-    <style>
-    /* Main styling */
-    .main-header {
-        background: linear-gradient(90deg, #1f77b4 0%, #ff7f0e 100%);
-        color: white;
-        padding: 1rem;
-        border-radius: 10px;
-        text-align: center;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .feature-card {
-        background: white;
-        border: 1px solid #e1e5e9;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        transition: all 0.3s ease;
-    }
-    
-    .feature-card:hover {
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        transform: translateY(-2px);
-    }
-    
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-        text-align: center;
-    }
-    
-    .status-indicator {
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        margin-right: 8px;
-    }
-    
-    .status-success { background-color: #28a745; }
-    .status-warning { background-color: #ffc107; }
-    .status-danger { background-color: #dc3545; }
-    .status-info { background-color: #17a2b8; }
-    
-    .chat-message {
-        background: #f8f9fa;
-        border-left: 4px solid #007bff;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        border-radius: 0 10px 10px 0;
-    }
-    
-    .source-citation {
-        background: #e9ecef;
-        border: 1px solid #dee2e6;
-        border-radius: 5px;
-        padding: 0.75rem;
-        margin: 0.5rem 0;
-        font-size: 0.9em;
-    }
-    
-    .processing-animation {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 2rem;
-    }
-    
-    /* Responsive design */
-    @media (max-width: 768px) {
-        .main-header {
-            padding: 0.5rem;
-            font-size: 1.2rem;
-        }
+    """Load external CSS stylesheet with theme-aware styling"""
+    # Load the external CSS file
+    css_path = os.path.join(os.path.dirname(__file__), 'styles.css')
+    try:
+        with open(css_path, 'r') as f:
+            css_content = f.read()
+        
+        st.markdown(f"""
+        <style>
+        {css_content}
+        
+        /* Hide Streamlit default elements */
+        #MainMenu {{visibility: hidden;}}
+        footer {{visibility: hidden;}}
+        .stDeployButton {{visibility: hidden;}}
+        </style>
+        """, unsafe_allow_html=True)
+        
+    except FileNotFoundError:
+        st.warning("⚠️ External CSS file not found, using minimal styling")
+        st.markdown("""
+        <style>
+        /* Minimal fallback styling */
         .feature-card {
-            margin: 0.5rem 0;
-            padding: 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(225, 229, 233, 0.8);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
-    }
-    
-    /* Hide Streamlit default elements */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stDeployButton {visibility: hidden;}
-    </style>
-    """,
-        unsafe_allow_html=True,
-    )
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        .stDeployButton {visibility: hidden;}
+        </style>
+        """, unsafe_allow_html=True)
 
 
 def initialize_session_state():
