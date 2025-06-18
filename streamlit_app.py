@@ -153,6 +153,40 @@ def main():
     create_footer()
 
 
+def inject_button_styling():
+    """Add CSS for consistent sample query button heights"""
+    st.markdown("""
+    <style>
+    /* Sample query button styling */
+    div[data-testid="column"] > div > div > button {
+        min-height: 60px !important;
+        height: auto !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        padding: 0.75rem 1rem !important;
+        line-height: 1.3 !important;
+    }
+    
+    /* Ensure button text wraps properly */
+    div[data-testid="column"] > div > div > button > div {
+        width: 100% !important;
+        text-align: center !important;
+    }
+    
+    /* Optional: Add hover effect for better UX */
+    div[data-testid="column"] > div > div > button:hover {
+        transform: translateY(-2px);
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
 def apply_custom_styling():
     """Load external CSS stylesheet with theme-aware styling"""
     # Load the external CSS file
@@ -349,7 +383,11 @@ def create_system_status():
 
 
 def create_sample_queries():
-    """Create sample query buttons"""
+    """Create sample query buttons with consistent sizing"""
+    
+    # Inject button styling
+    inject_button_styling()
+    
     st.markdown("### 💡 Try These Questions")
 
     sample_queries = [
@@ -370,7 +408,10 @@ def create_sample_queries():
         with col1:
             if i < len(sample_queries):
                 if st.button(
-                    f"❓ {sample_queries[i]}", key=f"sample_{i}", use_container_width=True, help="Click to ask this question"
+                    f"❓ {sample_queries[i]}", 
+                    key=f"sample_{i}", 
+                    use_container_width=True, 
+                    help="Click to ask this question"
                 ):
                     handle_sample_query(sample_queries[i])
 
@@ -603,29 +644,29 @@ def create_mock_extractor():
             return {
                 "text": """RESIDENTIAL LEASE AGREEMENT
                 
-Property Address: 123 Demo Street, Apt 5B, San Francisco, CA 94105
+Property Address: 64 Zoo Lane, Balimory, SW1A 1AA
 
 LEASE TERMS:
-Monthly Rent: $4,200.00 per month
-Security Deposit: $8,400.00 (equivalent to 2 months rent)
+Monthly Rent: £4,200.00 per month
+Security Deposit: £8,400.00 (equivalent to 2 months rent)
 Lease Duration: 12 months
 Start Date: January 1, 2024
 End Date: December 31, 2024
 
 PET POLICY:
 Pets are allowed with written approval from landlord.
-Pet deposit: $750.00 per pet (maximum 2 pets)
-Monthly pet rent: $125.00 per pet
+Pet deposit: £750.00 per pet (maximum 2 pets)
+Monthly pet rent: £125.00 per pet
 Restricted breeds: Pit bulls, Rottweilers, Dobermans
 
 UTILITIES:
-Tenant Responsible For: Electricity, Gas, Internet, Cable TV
-Landlord Responsible For: Water, Sewer, Trash, Recycling, Landscaping
-Estimated monthly utilities: $200-250
+Tenant Responsible For: Electricity, Gas, Internet, Sky TV
+Landlord Responsible For: 
+Estimated monthly utilities: £200-250
 
 PARKING:
 One assigned covered parking space included
-Additional spaces available: $275/month
+Additional spaces available: £275/month
 Guest parking: 3-hour limit in designated visitor areas
 
 TERMINATION CLAUSES:
@@ -635,14 +676,14 @@ Military clause: Early termination allowed with PCS orders
 
 MAINTENANCE:
 Landlord handles: Major repairs, HVAC, plumbing, electrical, appliances
-Tenant handles: Minor repairs under $100, light bulbs, air filters
+Tenant handles: Minor repairs under £100, light bulbs, air filters
 Emergency maintenance available 24/7
 
 ADDITIONAL FEES:
-Application fee: $200 (non-refundable)
-Move-in fee: $300 (one-time)
-Late rent fee: $100 (after 5th day of month)
-Key replacement: $75 per key""",
+Application fee: £200 (non-refundable)
+Move-in fee: £300 (one-time)
+Late rent fee: £100 (after 5th day of month)
+Key replacement: £75 per key""",
                 "confidence": 94.5,
                 "line_count": 35,
                 "character_count": 1247,
@@ -659,7 +700,7 @@ def generate_welcome_message(filename, extraction_result):
     char_count = len(extraction_result["text"])
     confidence = extraction_result.get("confidence", 0)
 
-    return f"""Hello! I've successfully analyzed your lease document '{filename}'. 
+    return f"""Hello! I've successfully analysed your lease document '{filename}'. 
 
 📊 **Processing Summary:**
 - Extracted {char_count:,} characters
@@ -685,7 +726,7 @@ def load_demo_data():
 
     demo_lease_text = """RESIDENTIAL TENANCY AGREEMENT
 
-Property: 456 Demo Avenue, Test City, CA 90210
+Property: 64 Zoo Lane, Balimory, SW1A 1AA
 Tenant: Demo User
 Landlord: Demo Properties LLC
 
@@ -1137,10 +1178,60 @@ def handle_sample_query(query):
 
 
 def show_welcome_screen():
-    """Show welcome screen when no document is processed"""
+    """Show welcome screen with equal height feature cards"""
     st.markdown("## 👋 Welcome to LeaseLens!")
 
-    # Feature overview
+    # Add CSS for perfect alignment and optimized text fit
+    st.markdown("""
+    <style>
+    /* Optimized height layout for welcome screen text content */
+    .block-container .stColumns {
+        display: flex !important;
+        align-items: stretch !important;
+        gap: 1rem !important;
+        min-height: 200px !important;
+    }
+    
+    .block-container .stColumns > div[data-testid="column"] {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 200px !important;
+    }
+    
+    .block-container .stColumns > div[data-testid="column"] > div {
+        min-height: 200px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 !important;
+    }
+    
+    /* Optimized feature cards for better text fit */
+    .feature-card {
+        height: 200px !important;
+        min-height: 200px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        padding: 1.25rem !important;
+    }
+    
+    /* Better text spacing in cards */
+    .feature-card h4 {
+        margin-bottom: 0.75rem !important;
+        font-size: 1.1rem !important;
+        line-height: 1.3 !important;
+    }
+    
+    .feature-card p {
+        font-size: 0.9rem !important;
+        line-height: 1.4 !important;
+        margin: 0 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Feature overview with equal height cards
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -1605,7 +1696,7 @@ def create_footer():
         st.markdown(
             """
         **🔗 Links**  
-        [GitHub Repository](https://github.com/yourusername/lease-lens-demo)  
+        [GitHub Repository](https://github.com/miwhipps/lease-lens-demo)  
         [Documentation](https://github.com/yourusername/lease-lens-demo/wiki)
         """
         )
